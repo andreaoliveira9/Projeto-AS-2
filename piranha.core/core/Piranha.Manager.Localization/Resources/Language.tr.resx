@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ChangeDefaultConfirm" xml:space="preserve">
+    <value>Tabii lisanın değiştirilmesi, uygulamanın davranışını etkiler ve ilk kurma esnasında yapılandırılmalıdır.</value>
+  </data>
+  <data name="RemoveLanguageConfirm" xml:space="preserve">
+    <value>Bu hareket &lt;strong>geri alınamaz&lt;/strong>. Bu yol, {{ currentDelete.title }} lisanı ve ona ait tüm &lt;strong>tercümeleri&lt;/strong> kalıcı olarak siler. Bu {{ currentDelete.title }} lisan olarak seçen tüm sayfalara, tabii olan lisan tahsis edilir.</value>
+  </data>
+  <data name="The language was successfully saved" xml:space="preserve">
+    <value>The language was successfully saved</value>
+  </data>
+  <data name="The language was successfully deleted" xml:space="preserve">
+    <value>Dil başarıyla silindi</value>
+  </data>
+</root>
