@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TargetFramework>net9.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\Piranha\Piranha.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.AspNetCore\Piranha.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.AspNetCore.Hosting\Piranha.AspNetCore.Hosting.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.AttributeBuilder\Piranha.AttributeBuilder.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.ImageSharp\Piranha.ImageSharp.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Local.FileStorage\Piranha.Local.FileStorage.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Manager\Piranha.Manager.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Manager.LocalAuth\Piranha.Manager.LocalAuth.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Manager.TinyMCE\Piranha.Manager.TinyMCE.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Manager.Workflow\Piranha.Manager.Workflow.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Workflow\Piranha.Workflow.csproj" />
+    <ProjectReference Include="..\..\data\Piranha.Data.EF\Piranha.Data.EF.csproj" />
+    <ProjectReference Include="..\..\data\Piranha.Data.EF.SQLite\Piranha.Data.EF.SQLite.csproj" />
+    <ProjectReference Include="..\..\identity\Piranha.AspNetCore.Identity\Piranha.AspNetCore.Identity.csproj" />
+    <ProjectReference Include="..\..\identity\Piranha.AspNetCore.Identity.SQLite\Piranha.AspNetCore.Identity.SQLite.csproj" />
+  </ItemGroup>
+
+</Project> 

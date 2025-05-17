@@ -1,0 +1,59 @@
+@model ListModel
+@{
+    ViewBag.Title = "Workflows";
+    ViewBag.MenuItem = "Workflows";
+}
+
+<div class="container-fluid">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Workflows</li>
+            </ol>
+        </nav>
+
+        <div class="container">
+            <div class="row">
+                <div class="col">
+                    <h1>@ViewBag.Title</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mb-5">
+        <div class="row">
+            <div class="col-md-12">
+                <table class="table table-borderless">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>States</th>
+                            <th>Transitions</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Definitions)
+                        {
+                            <tr>
+                                <td>@item.Name</td>
+                                <td>@item.Description</td>
+                                <td>@(item.IsActive ? "Active" : "Inactive")</td>
+                                <td>@item.States.Count</td>
+                                <td>@item.TransitionRules.Count</td>
+                                <td class="actions">
+                                    <a href="~/manager/workflow/@item.Id" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div> 

@@ -1,0 +1,148 @@
+@model WorkflowModel
+@{
+    ViewBag.Title = Model.Definition.Name;
+    ViewBag.MenuItem = "Workflows";
+}
+
+<div class="container-fluid">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="~/manager/workflows">Workflows</a></li>
+                <li class="breadcrumb-item active" aria-current="page">@Model.Definition.Name</li>
+            </ol>
+        </nav>
+
+        <div class="container">
+            <div class="row">
+                <div class="col">
+                    <h1>@Model.Definition.Name</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mb-5">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-3">
+                    <div class="card-header">Details</div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-2">Description</dt>
+                            <dd class="col-sm-10">@Model.Definition.Description</dd>
+
+                            <dt class="col-sm-2">Status</dt>
+                            <dd class="col-sm-10">@(Model.Definition.IsActive ? "Active" : "Inactive")</dd>
+
+                            <dt class="col-sm-2">Content Types</dt>
+                            <dd class="col-sm-10">
+                                @if (Model.Definition.ContentTypes.Any())
+                                {
+                                    @string.Join(", ", Model.Definition.ContentTypes)
+                                }
+                                else
+                                {
+                                    <em>All content types</em>
+                                }
+                            </dd>
+
+                            <dt class="col-sm-2">Created</dt>
+                            <dd class="col-sm-10">@Model.Definition.Created.ToString("g")</dd>
+
+                            <dt class="col-sm-2">Last Modified</dt>
+                            <dd class="col-sm-10">@Model.Definition.LastModified.ToString("g")</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">States</div>
+                    <div class="card-body p-0">
+                        <table class="table table-borderless mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var state in Model.Definition.States.OrderBy(s => s.SortOrder))
+                                {
+                                    <tr>
+                                        <td>
+                                            <span class="badge" style="background-color: @state.Color">@state.Name</span>
+                                        </td>
+                                        <td>@state.Description</td>
+                                        <td>
+                                            @if (state.IsInitial)
+                                            {
+                                                <span class="badge bg-primary">Initial</span>
+                                            }
+                                            @if (state.IsTerminal)
+                                            {
+                                                <span class="badge bg-success">Terminal</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">Transitions</div>
+                    <div class="card-body p-0">
+                        <table class="table table-borderless mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Allowed Roles</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var transition in Model.Definition.TransitionRules.OrderBy(t => t.SortOrder))
+                                {
+                                    var fromState = Model.Definition.GetState(transition.FromStateId);
+                                    var toState = Model.Definition.GetState(transition.ToStateId);
+
+                                    <tr>
+                                        <td>@transition.Name</td>
+                                        <td>
+                                            @if (fromState != null)
+                                            {
+                                                <span class="badge" style="background-color: @fromState.Color">@fromState.Name</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (toState != null)
+                                            {
+                                                <span class="badge" style="background-color: @toState.Color">@toState.Name</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @foreach (var role in transition.AllowedRoles)
+                                            {
+                                                <span class="badge bg-secondary">@role</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 

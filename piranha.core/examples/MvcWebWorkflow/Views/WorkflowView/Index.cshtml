@@ -1,0 +1,33 @@
+@model MvcWebWorkflow.Models.WorkflowListViewModel
+@{
+    ViewData["Title"] = "Workflow Definitions";
+}
+
+<div class="container mt-5">
+    <h1>Workflow Definitions</h1>
+    <p class="lead">This page lists all available workflow definitions in the system.</p>
+
+    <div class="row mt-4">
+        @foreach (var definition in Model.Definitions)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">@definition.Name</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">@definition.Description</p>
+                        <p>
+                            <strong>States:</strong> @definition.States.Count<br />
+                            <strong>Transitions:</strong> @definition.TransitionRules.Count<br />
+                            <strong>Status:</strong> @(definition.IsActive ? "Active" : "Inactive")<br />
+                            <strong>Created:</strong> @definition.Created.ToString("g")<br />
+                            <strong>Last Modified:</strong> @definition.LastModified.ToString("g")
+                        </p>
+                        <a href="/workflow/@definition.Id" class="btn btn-primary">View Details</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div> 

@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <Description>Manager module for Piranha CMS editorial workflow integration</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\Piranha\Piranha.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Manager\Piranha.Manager.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.Workflow\Piranha.Workflow.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="assets\dist\**\*" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,137 @@
+@model MvcWebWorkflow.Models.WorkflowDetailViewModel
+@{
+    ViewData["Title"] = Model.Definition.Name;
+}
+
+<div class="container mt-5">
+    <h1>@Model.Definition.Name</h1>
+    <p class="lead">@Model.Definition.Description</p>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Workflow Information</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>ID:</strong> @Model.Definition.Id<br />
+                        <strong>Status:</strong> @(Model.Definition.IsActive ? "Active" : "Inactive")<br />
+                        <strong>Created:</strong> @Model.Definition.Created.ToString("g")<br />
+                        <strong>Last Modified:</strong> @Model.Definition.LastModified.ToString("g")
+                    </p>
+                    
+                    <h6>Content Types</h6>
+                    <ul>
+                        @if (Model.Definition.ContentTypes.Any())
+                        {
+                            @foreach (var contentType in Model.Definition.ContentTypes)
+                            {
+                                <li>@contentType</li>
+                            }
+                        }
+                        else
+                        {
+                            <li><em>This workflow applies to all content types</em></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">States</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var state in Model.Definition.States.OrderBy(s => s.SortOrder))
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="badge" style="background-color: @state.Color">@state.Name</span>
+                                    </td>
+                                    <td>@state.Description</td>
+                                    <td>
+                                        @if (state.IsInitial)
+                                        {
+                                            <span class="badge bg-primary">Initial</span>
+                                        }
+                                        @if (state.IsTerminal)
+                                        {
+                                            <span class="badge bg-success">Terminal</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Transition Rules</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>From</th>
+                                <th>To</th>
+                                <th>Allowed Roles</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var transition in Model.Definition.TransitionRules.OrderBy(t => t.SortOrder))
+                            {
+                                var fromState = Model.Definition.GetState(transition.FromStateId);
+                                var toState = Model.Definition.GetState(transition.ToStateId);
+                                
+                                <tr>
+                                    <td>@transition.Name</td>
+                                    <td>
+                                        @if (fromState != null)
+                                        {
+                                            <span class="badge" style="background-color: @fromState.Color">@fromState.Name</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (toState != null)
+                                        {
+                                            <span class="badge" style="background-color: @toState.Color">@toState.Name</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @foreach (var role in transition.AllowedRoles)
+                                        {
+                                            <span class="badge bg-secondary">@role</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a href="/workflows" class="btn btn-secondary">Back to List</a>
+    </div>
+</div> 

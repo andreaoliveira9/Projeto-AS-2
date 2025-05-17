@@ -1,0 +1,324 @@
+@* Editorial Workflow Panel *@
+
+<div id="workflow-panel" class="card mb-3">
+    <div class="card-header">
+        <div class="card-title">Editorial Workflow</div>
+    </div>
+    <div class="card-body">
+        <div id="workflow-status" class="mb-3 d-none">
+            <h6>Current State</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <span id="workflow-state-badge" class="badge" style="font-size: 1rem; display: block; padding: 0.5rem 1rem; margin-bottom: 0.5rem;"></span>
+                </div>
+                <div class="col-md-6">
+                    <div id="workflow-details">
+                        <small class="text-muted">Created: <span id="workflow-created"></span></small><br>
+                        <small class="text-muted">Last transition: <span id="workflow-last-transition"></span></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="workflow-history" class="mb-3 d-none">
+            <h6>Workflow History</h6>
+            <div id="workflow-history-list" class="small">
+                <!-- History items will be inserted here -->
+            </div>
+        </div>
+
+        <div id="workflow-actions">
+            <div id="workflow-no-instance" class="alert alert-info mb-3">
+                <p>This content does not have a workflow attached.</p>
+                <button id="btn-create-workflow" class="btn btn-primary" data-toggle="modal" data-target="#workflowCreateModal">Attach Workflow</button>
+            </div>
+
+            <div id="workflow-transitions" class="d-none">
+                <h6>Available Actions</h6>
+                <div id="workflow-transitions-list" class="mb-3">
+                    <!-- Transition buttons will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Workflow Modal -->
+<div class="modal fade" id="workflowCreateModal" tabindex="-1" role="dialog" aria-labelledby="workflowCreateModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="workflowCreateModalLabel">Attach Workflow</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="workflow-create-form">
+                    <div class="form-group">
+                        <label for="workflow-definition">Select Workflow:</label>
+                        <select id="workflow-definition" class="form-control">
+                            <option value="">-- Select a workflow --</option>
+                            <!-- Hardcoded options for testing - will be replaced by JavaScript -->
+                            <option value="test-standard">Standard Editorial Workflow</option>
+                            <option value="test-simple">Simple Workflow</option>
+                        </select>
+                    </div>
+                    <!-- Debug information -->
+                    <div id="debug-info" class="alert alert-info mt-3">
+                        <p>Debugging Info:</p>
+                        <div id="debug-output">Loading workflow definitions...</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="btn-confirm-create-workflow" class="btn btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transition Modal -->
+<div class="modal fade" id="workflowTransitionModal" tabindex="-1" role="dialog" aria-labelledby="workflowTransitionModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="workflowTransitionModalLabel">Perform Transition</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="workflow-transition-form">
+                    <input type="hidden" id="transition-id" />
+                    <div class="form-group">
+                        <label for="transition-comment">Comment:</label>
+                        <textarea id="transition-comment" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="btn-confirm-transition" class="btn btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Basic direct script to check if we can access the page elements
+    console.log("Script running outside document.ready");
+    
+    // Check workflow dropdown
+    var workflowSelect = document.getElementById('workflow-definition');
+    if (workflowSelect) {
+        console.log("Found workflow dropdown:", workflowSelect.options.length, "options");
+    } else {
+        console.log("Couldn't find workflow dropdown");
+    }
+    
+    // Check debug area
+    var debugArea = document.getElementById('debug-output');
+    if (debugArea) {
+        debugArea.innerHTML = "Script executed - found debug area";
+    } else {
+        console.log("Couldn't find debug area");
+    }
+    
+    // Check if jQuery and piranha are available
+    console.log("jQuery available:", typeof $ !== 'undefined');
+    console.log("Piranha available:", typeof piranha !== 'undefined');
+    if (typeof piranha !== 'undefined') {
+        console.log("Piranha workflow available:", typeof piranha.workflow !== 'undefined');
+    }
+</script>
+
+@section script
+{
+    <script>
+        $(document).ready(function () {
+            console.log("Document ready function running");
+            
+            // Get content ID from the page URL or a hidden field
+            var contentId = $('input[name="Id"]').val();
+            console.log("Content ID:", contentId);
+            
+            if (!contentId) {
+                $('#debug-output').html("No content ID found - workflow functionality won't work correctly");
+                return;
+            }
+
+            // Load workflow definitions directly from the test API
+            $('#debug-output').html("Loading workflow definitions...");
+            
+            // Use raw XMLHttpRequest for maximum compatibility
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', piranha.baseUrl + '/manager/api/workflow/test-definitions', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    console.log("API response status:", xhr.status);
+                    if (xhr.status === 200) {
+                        try {
+                            var result = JSON.parse(xhr.responseText);
+                            console.log("API response:", result);
+                            
+                            if (result.status === "success" && result.definitions && result.definitions.length > 0) {
+                                $('#debug-output').html("Found " + result.definitions.length + " workflow definitions");
+                                
+                                // Clear the dropdown and add the new options
+                                var select = document.getElementById('workflow-definition');
+                                select.innerHTML = '<option value="">-- Select a workflow --</option>';
+                                
+                                // Add each definition to the dropdown
+                                result.definitions.forEach(function(def) {
+                                    var option = document.createElement('option');
+                                    option.value = def.id;
+                                    option.textContent = def.name;
+                                    select.appendChild(option);
+                                    
+                                    // Log details
+                                    $('#debug-output').append("<br>" + def.name + " (" + def.id + ")");
+                                });
+                                
+                                console.log("Added", result.definitions.length, "options to dropdown");
+                            } else {
+                                $('#debug-output').html("Error: No workflow definitions found in API response");
+                            }
+                        } catch (e) {
+                            console.error("Error parsing API response:", e);
+                            $('#debug-output').html("Error parsing API response: " + e.message);
+                        }
+                    } else {
+                        $('#debug-output').html("Error fetching workflow definitions: " + xhr.status);
+                    }
+                }
+            };
+            xhr.send();
+
+            // Button handlers
+            $('#btn-confirm-create-workflow').click(function () {
+                var definitionId = $('#workflow-definition').val();
+                var contentType = piranha.editor.contentType;
+
+                if (!definitionId) {
+                    alert("Please select a workflow");
+                    return;
+                }
+
+                $('#debug-output').html('Creating workflow instance...<br>Content Type: ' + contentType + '<br>Definition ID: ' + definitionId);
+                
+                // Check if piranha.workflow is available
+                if (!piranha.workflow || !piranha.workflow.createWorkflowInstance) {
+                    console.error("piranha.workflow or createWorkflowInstance method not available");
+                    $('#debug-output').append('<div class="text-danger">Error: workflow.js not properly loaded</div>');
+                    return;
+                }
+
+                piranha.workflow.createWorkflowInstance(contentId, {
+                    contentType: contentType,
+                    workflowDefinitionId: definitionId
+                }, function (result) {
+                    if (result.status === "success") {
+                        $('#workflowCreateModal').modal('hide');
+                        loadContentWorkflow();
+                    } else {
+                        alert('Error: ' + result.message);
+                        $('#debug-output').html('Error: ' + result.message);
+                    }
+                });
+            });
+
+            $('#btn-confirm-transition').click(function () {
+                var transitionId = $('#transition-id').val();
+                var comment = $('#transition-comment').val();
+
+                piranha.workflow.performTransition(contentId, {
+                    transitionId: transitionId,
+                    comment: comment
+                }, function (result) {
+                    if (result.status === "success") {
+                        $('#workflowTransitionModal').modal('hide');
+                        loadContentWorkflow();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                });
+            });
+
+            function loadContentWorkflow() {
+                piranha.workflow.getContentWorkflow(contentId, function (result) {
+                    if (result.status === "success") {
+                        // We have a workflow instance
+                        $('#workflow-no-instance').addClass('d-none');
+                        $('#workflow-status').removeClass('d-none');
+                        $('#workflow-history').removeClass('d-none');
+
+                        var instance = result.instance;
+                        var currentState = instance.currentState;
+
+                        // Update state info
+                        $('#workflow-state-badge').text(currentState.name);
+                        $('#workflow-state-badge').css('background-color', currentState.color);
+                        $('#workflow-created').text(new Date(instance.created).toLocaleString());
+                        $('#workflow-last-transition').text(new Date(instance.lastTransition).toLocaleString());
+
+                        // Update history
+                        $('#workflow-history-list').empty();
+                        instance.stateChangeHistory.forEach(function (change) {
+                            var date = new Date(change.transitionDate).toLocaleString();
+                            var fromState = change.fromState ? change.fromState.name : 'None';
+                            var toState = change.toState ? change.toState.name : 'None';
+                            var comment = change.comment ? change.comment : '';
+                            
+                            $('#workflow-history-list').append(`
+                                <div class="mb-2">
+                                    <strong>${date}</strong>: ${fromState} → ${toState}<br>
+                                    <span class="text-muted">${change.performedBy || 'System'}</span>
+                                    ${comment ? '<br><em>' + comment + '</em>' : ''}
+                                </div>
+                            `);
+                        });
+
+                        // Load available transitions
+                        loadAvailableTransitions();
+                    } else {
+                        // No workflow instance
+                        $('#workflow-no-instance').removeClass('d-none');
+                        $('#workflow-status').addClass('d-none');
+                        $('#workflow-history').addClass('d-none');
+                        $('#workflow-transitions').addClass('d-none');
+                    }
+                });
+            }
+
+            function loadAvailableTransitions() {
+                piranha.workflow.getAvailableTransitions(contentId, function (result) {
+                    if (result.status === "success" && result.transitions && result.transitions.length > 0) {
+                        $('#workflow-transitions').removeClass('d-none');
+                        $('#workflow-transitions-list').empty();
+                        
+                        result.transitions.forEach(function (transition) {
+                            $('#workflow-transitions-list').append(`
+                                <button class="btn btn-sm btn-outline-primary mr-2 mb-2 transition-button" 
+                                        data-toggle="modal" 
+                                        data-target="#workflowTransitionModal"
+                                        data-transition-id="${transition.id}">
+                                    ${transition.name}
+                                </button>
+                            `);
+                        });
+                        
+                        // Attach event handlers for transitions
+                        $('.transition-button').click(function () {
+                            var transitionId = $(this).data('transition-id');
+                            $('#transition-id').val(transitionId);
+                        });
+                    } else {
+                        $('#workflow-transitions').addClass('d-none');
+                    }
+                });
+            }
+        });
+    </script>
+} 
