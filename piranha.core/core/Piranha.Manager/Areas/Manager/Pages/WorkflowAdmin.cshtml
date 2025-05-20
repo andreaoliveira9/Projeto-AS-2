@@ -1,0 +1,271 @@
+@page
+@model Piranha.Manager.Areas.Manager.Pages.WorkflowAdminModel
+@inject Microsoft.AspNetCore.Authorization.IAuthorizationService Auth
+@{
+    ViewBag.Title = "Workflow Administration";
+    ViewBag.MenuItem = "Workflow";
+}
+
+@section script
+{
+    <script src="~/manager/assets/js/piranha.workflowadmin.min.js"></script>
+    <script>
+        piranha.workflowadmin.load();
+    </script>
+}
+
+<div class="top">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">Settings</li>
+            <li class="breadcrumb-item active" aria-current="page">Workflow Administration</li>
+        </ol>
+    </nav>
+
+    <div class="container-fluid app" id="workflowadmin">
+        <div class="top-nav">
+            <ul class="nav nav-tabs">
+                <li class="nav-item">
+                    <a class="nav-link" :class="{ active: activeTab === 'workflows' }" v-on:click.prevent="activeTab = 'workflows'" href="#">Workflows</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" :class="{ active: activeTab === 'roles' }" v-on:click.prevent="activeTab = 'roles'" href="#">Role Assignments</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" :class="{ active: activeTab === 'content' }" v-on:click.prevent="activeTab = 'content'" href="#">Content Status</a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="card" v-if="activeTab === 'workflows'">
+            <div class="card-header">
+                <div class="row">
+                    <div class="col">
+                        <h3>Workflow Definitions</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div v-for="workflow in workflows" :key="workflow.workflowName" class="mb-4">
+                    <h4>{{ workflow.workflowName }}</h4>
+                    <p>{{ workflow.description }}</p>
+                    
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>State</th>
+                                <th>Description</th>
+                                <th>Initial</th>
+                                <th>Published</th>
+                                <th>Transitions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="state in workflow.states" :key="state.currentStateId">
+                                <td><strong>{{ state.currentStateName }}</strong></td>
+                                <td>{{ state.description }}</td>
+                                <td><i v-if="state.isInitial" class="fas fa-check text-success"></i></td>
+                                <td><i v-if="state.isPublished" class="fas fa-check text-success"></i></td>
+                                <td>
+                                    <div v-if="state.availableTransitions.length > 0">
+                                        <ul class="list-unstyled">
+                                            <li v-for="transition in state.availableTransitions" :key="transition.toStateId">
+                                                <strong>{{ transition.toStateName }}</strong> 
+                                                <span class="text-muted">({{ transition.roles.join(', ') }})</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div v-else class="text-muted">
+                                        No transitions available
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" v-if="activeTab === 'roles'">
+            <div class="card-header">
+                <div class="row">
+                    <div class="col">
+                        <h3>Role Assignments</h3>
+                    </div>
+                    <div class="col text-right">
+                        <button class="btn btn-primary" v-on:click="showAddRoleModal()">
+                            <i class="fas fa-plus"></i> Add Role Assignment
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-hover">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Assigned By</th>
+                            <th>Assigned Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="assignment in roleAssignments" :key="assignment.id">
+                            <td>{{ assignment.username }}</td>
+                            <td>{{ assignment.role }}</td>
+                            <td>{{ assignment.assignedBy }}</td>
+                            <td>{{ formatDate(assignment.assignedDate) }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger" v-on:click="removeRoleAssignment(assignment.id)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr v-if="roleAssignments.length === 0">
+                            <td colspan="5" class="text-center">No role assignments found</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card" v-if="activeTab === 'content'">
+            <div class="card-header">
+                <div class="row">
+                    <div class="col">
+                        <h3>Content Workflow Status</h3>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <select v-model="selectedStateFilter" class="form-control" v-on:change="loadContentByState">
+                                <option value="">-- All States --</option>
+                                <option v-for="state in allStates" :value="state.id">{{ state.name }}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-hover">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Content Type</th>
+                            <th>Workflow</th>
+                            <th>Current State</th>
+                            <th>Changed At</th>
+                            <th>Changed By</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="content in contentItems" :key="content.contentId">
+                            <td>{{ content.contentTitle }}</td>
+                            <td>{{ content.contentType }}</td>
+                            <td>{{ content.workflowState.workflowName }}</td>
+                            <td>
+                                <span class="badge" :class="getStateBadgeClass(content.workflowState.currentStateId)">
+                                    {{ content.workflowState.currentStateName }}
+                                </span>
+                            </td>
+                            <td>{{ formatDate(content.workflowState.stateChangedAt) }}</td>
+                            <td>{{ content.workflowState.stateChangedBy }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <a :href="'/manager/page/edit/' + content.contentId" v-if="content.contentType === 'Page'" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a :href="'/manager/post/edit/' + content.contentId" v-if="content.contentType === 'Post'" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-secondary" v-on:click="viewWorkflowHistory(content.contentId)">
+                                        <i class="fas fa-history"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="contentItems.length === 0">
+                            <td colspan="7" class="text-center">No content items found</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Add Role Assignment Modal -->
+        <div class="modal fade" id="addRoleModal" tabindex="-1" role="dialog" aria-labelledby="addRoleModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addRoleModalLabel">Add Role Assignment</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="addRoleForm">
+                            <div class="form-group">
+                                <label for="userName">User</label>
+                                <select id="userName" class="form-control" v-model="newRoleAssignment.username">
+                                    <option value="">-- Select User --</option>
+                                    <option v-for="user in users" :value="user.username">{{ user.username }}</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="roleName">Role</label>
+                                <select id="roleName" class="form-control" v-model="newRoleAssignment.role">
+                                    <option value="">-- Select Role --</option>
+                                    <option v-for="role in workflowRoles" :value="role">{{ role }}</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" v-on:click="addRoleAssignment()">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflow History Modal -->
+        <div class="modal fade" id="historyModal" tabindex="-1" role="dialog" aria-labelledby="historyModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="historyModalLabel">Workflow History</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" v-if="selectedWorkflowHistory">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>User</th>
+                                    <th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(item, index) in selectedWorkflowHistory.history" :key="index">
+                                    <td>{{ formatDate(item.transitionedAt) }}</td>
+                                    <td>{{ item.fromStateName || 'Created' }}</td>
+                                    <td>{{ item.toStateName }}</td>
+                                    <td>{{ item.transitionedBy }}</td>
+                                    <td>{{ item.comment }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

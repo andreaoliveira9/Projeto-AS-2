@@ -1,0 +1,214 @@
+@model Piranha.Manager.Models.WorkflowStateViewModel
+@inject Piranha.Manager.Services.WorkflowService WorkflowService
+@{
+    var availableTransitions = await WorkflowService.GetAvailableTransitionsAsync(Model.ContentId, User.Claims
+        .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
+        .Select(c => c.Value));
+}
+
+<div class="workflow-state-container card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <span>Workflow State</span>
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="current-state mb-3">
+            <h6>Current State</h6>
+            <div class="state-badge @(Model.IsPublished ? "state-published" : null)">
+                @Model.CurrentStateName
+            </div>
+            <p class="small text-muted">
+                Changed @Model.StateChangedAt.ToString("g") by @Model.StateChangedBy
+            </p>
+            @if (!string.IsNullOrEmpty(Model.StateChangeComment))
+            {
+                <div class="state-comment">
+                    <p><strong>Comment:</strong> @Model.StateChangeComment</p>
+                </div>
+            }
+        </div>
+
+        @if (availableTransitions.Any())
+        {
+            <div class="available-transitions">
+                <h6>Available Transitions</h6>
+                <form id="workflowTransitionForm">
+                    <div class="mb-3">
+                        <select id="toStateId" class="form-control">
+                            <option value="">-- Select State --</option>
+                            @foreach (var transition in availableTransitions)
+                            {
+                                <option value="@transition.ToStateId" data-comment="@transition.Comment">@transition.ToStateName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="transitionComment">Comment</label>
+                        <textarea id="transitionComment" class="form-control" rows="3"></textarea>
+                    </div>
+                    <button type="button" id="transitionButton" class="btn btn-primary">Transition</button>
+                </form>
+            </div>
+        }
+    </div>
+
+    @if (Model.History.Any())
+    {
+        <div class="card-footer">
+            <h6>Transition History</h6>
+            <div class="state-history">
+                @foreach (var item in Model.History.Take(5))
+                {
+                    <div class="history-item">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <span class="badge @(item.ToStateId == "published" ? "badge-success" : "badge-secondary")">
+                                    @(string.IsNullOrEmpty(item.FromStateId) ? "Created" : item.FromStateName) → @item.ToStateName
+                                </span>
+                            </div>
+                            <div class="text-muted small">
+                                @item.TransitionedAt.ToString("g")
+                            </div>
+                        </div>
+                        <div class="text-muted small">
+                            <strong>By:</strong> @item.TransitionedBy
+                        </div>
+                        @if (!string.IsNullOrEmpty(item.Comment))
+                        {
+                            <div class="history-comment mt-1">
+                                <small>@item.Comment</small>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (Model.History.Count > 5)
+                {
+                    <div class="text-center">
+                        <a href="#" data-toggle="modal" data-target="#workflowHistoryModal">Show full history</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.History.Count > 0)
+{
+    <div class="modal fade" id="workflowHistoryModal" tabindex="-1" role="dialog" aria-labelledby="workflowHistoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="workflowHistoryModalLabel">Workflow History</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>User</th>
+                                    <th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.History)
+                                {
+                                    <tr>
+                                        <td>@item.TransitionedAt.ToString("g")</td>
+                                        <td>@(string.IsNullOrEmpty(item.FromStateId) ? "Created" : item.FromStateName)</td>
+                                        <td>@item.ToStateName</td>
+                                        <td>@item.TransitionedBy</td>
+                                        <td>@item.Comment</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .workflow-state-container {
+        margin-bottom: 1.5rem;
+    }
+    .state-badge {
+        display: inline-block;
+        padding: 0.4rem 0.8rem;
+        border-radius: 4px;
+        background-color: #f0f0f0;
+        font-weight: bold;
+    }
+    .state-published {
+        background-color: #28a745;
+        color: white;
+    }
+    .state-history {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .history-item {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .history-item:last-child {
+        border-bottom: none;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize transition comment based on selected state
+        var toStateSelect = document.getElementById('toStateId');
+        var commentInput = document.getElementById('transitionComment');
+        
+        if (toStateSelect) {
+            toStateSelect.addEventListener('change', function () {
+                var selectedOption = this.options[this.selectedIndex];
+                var defaultComment = selectedOption.getAttribute('data-comment');
+                if (defaultComment) {
+                    commentInput.value = defaultComment;
+                } else {
+                    commentInput.value = '';
+                }
+            });
+            
+            // Handle transition button click
+            document.getElementById('transitionButton').addEventListener('click', function () {
+                var contentId = '@Model.ContentId';
+                var toStateId = toStateSelect.value;
+                var comment = commentInput.value;
+                
+                if (!toStateId) {
+                    piranha.notifications.error('Please select a state to transition to.');
+                    return;
+                }
+                
+                piranha.api.post({
+                    url: '@Url.Action("Transition", "WorkflowApi", new { area = "Manager" })/' + contentId + '/' + toStateId,
+                    body: {
+                        comment: comment
+                    },
+                    success: function (result) {
+                        piranha.notifications.success('Content transitioned successfully.');
+                        window.location.reload();
+                    },
+                    error: function (error) {
+                        piranha.notifications.error('Failed to transition content: ' + error.message);
+                    }
+                });
+            });
+        }
+    });
+</script>

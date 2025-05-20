@@ -1,0 +1,54 @@
+using Microsoft.EntityFrameworkCore;
+using Piranha.Data;
+
+namespace Piranha.Data.EF;
+
+/// <summary>
+/// Extension of the EF database context with workflow state tables.
+/// </summary>
+public partial class Db
+{
+    /// <summary>
+    /// Gets/sets the content workflow states.
+    /// </summary>
+    public virtual DbSet<ContentWorkflowState> ContentWorkflowStates { get; set; }
+
+    /// <summary>
+    /// Gets/sets the content workflow state transitions.
+    /// </summary>
+    public virtual DbSet<ContentWorkflowStateTransition> ContentWorkflowStateTransitions { get; set; }
+
+    /// <summary>
+    /// Configure workflow state model.
+    /// </summary>
+    /// <param name="modelBuilder">The model builder</param>
+    private void ConfigureWorkflowStateModel(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ContentWorkflowState>(entity =>
+        {
+            entity.ToTable("Piranha_ContentWorkflowStates");
+            entity.HasKey(e => e.ContentId);
+            entity.Property(e => e.WorkflowName).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.CurrentStateId).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.StateChangedAt).IsRequired();
+            entity.Property(e => e.StateChangedBy).HasMaxLength(128);
+            entity.HasIndex(e => new { e.WorkflowName, e.CurrentStateId });
+        });
+
+        modelBuilder.Entity<ContentWorkflowStateTransition>(entity =>
+        {
+            entity.ToTable("Piranha_ContentWorkflowStateTransitions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ContentId).IsRequired();
+            entity.Property(e => e.FromStateId).HasMaxLength(64);
+            entity.Property(e => e.ToStateId).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.TransitionedAt).IsRequired();
+            entity.Property(e => e.TransitionedBy).HasMaxLength(128);
+            entity.HasIndex(e => e.ContentId);
+            entity.HasOne<ContentWorkflowState>()
+                .WithMany()
+                .HasForeignKey(e => e.ContentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+}

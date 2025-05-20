@@ -4,6 +4,9 @@ using Piranha.AspNetCore.Identity.SQLite;
 using Piranha.AttributeBuilder;
 using Piranha.Data.EF.SQLite;
 using Piranha.Manager.Editor;
+using Piranha.Extensions;
+using Piranha.Workflow;
+using MvcWeb.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,16 +31,20 @@ builder.AddPiranha(options =>
     var connectionString = builder.Configuration.GetConnectionString("piranha");
     options.UseEF<SQLiteDb>(db => db.UseSqlite(connectionString));
     options.UseIdentityWithSeed<IdentitySQLiteDb>(db => db.UseSqlite(connectionString));
+    
+    // Add workflow module
+    options.Services.AddPiranhaWorkflow();
 
     /**
      * Here you can configure the different permissions
      * that you want to use for securing content in the
      * application.
+     */
     options.UseSecurity(o =>
     {
-        o.UsePermission("WebUser", "Web User");
+        o.UsePermission("Editor", "Editor");
+        o.UsePermission("LegalReviewer", "Legal Reviewer");
     });
-     */
 
     /**
      * Here you can specify the login url for the front end
@@ -71,6 +78,29 @@ app.UsePiranha(options =>
     options.UseManager();
     options.UseTinyMCE();
     options.UseIdentity();
+    
+    // Workflow is initialized directly
 });
+
+// Initialize the workflow module after app is built
+app.Services.UsePiranhaWorkflow();
+
+// Add the Editor & Legal Reviewer roles to the identity system if they don't exist
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>>();
+    
+    // Ensure required roles exist
+    string[] roles = { "Editor", "LegalReviewer" };
+    
+    foreach (var roleName in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            await roleManager.CreateAsync(new Microsoft.AspNetCore.Identity.IdentityRole(roleName));
+        }
+    }
+}
+
 
 app.Run();

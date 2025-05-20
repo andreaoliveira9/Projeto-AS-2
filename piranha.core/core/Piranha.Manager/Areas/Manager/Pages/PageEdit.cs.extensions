@@ -1,0 +1,51 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Piranha.Manager.Models;
+using Piranha.Manager.Services;
+
+namespace Piranha.Manager.Areas.Manager.Pages;
+
+/// <summary>
+/// Extension of the page edit page model to include workflow state.
+/// </summary>
+public partial class PageEditModel
+{
+    private readonly Services.WorkflowService _workflowService;
+
+    /// <summary>
+    /// Gets/sets the workflow state for the page.
+    /// </summary>
+    public WorkflowStateViewModel WorkflowState { get; set; }
+
+    /// <summary>
+    /// Initializes the page edit model with the workflow service.
+    /// </summary>
+    /// <param name="workflowService">The workflow service</param>
+    protected async Task InitializeWorkflow()
+    {
+        if (Id.HasValue)
+        {
+            WorkflowState = await _workflowService.GetWorkflowStateAsync(Id.Value);
+        }
+    }
+
+    /// <summary>
+    /// Initializes a new workflow for the page if it doesn't have one.
+    /// </summary>
+    /// <param name="id">The page id</param>
+    /// <returns>True if workflow was initialized</returns>
+    protected async Task<bool> EnsureWorkflowAsync(Guid id)
+    {
+        var state = await _workflowService.GetWorkflowStateAsync(id);
+
+        if (state == null)
+        {
+            // Page doesn't have a workflow state, initialize one
+            state = await _workflowService.InitWorkflowAsync(id, "Standard Editorial Workflow", User.Identity.Name);
+            return state != null;
+        }
+
+        return true;
+    }
+}

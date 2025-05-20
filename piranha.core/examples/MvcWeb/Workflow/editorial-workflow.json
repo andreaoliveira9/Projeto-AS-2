@@ -1,0 +1,114 @@
+{
+  "workflowName": "Standard Editorial Workflow",
+  "description": "Standard editorial workflow with draft, review, approval, and publish stages",
+  "states": [
+    {
+      "id": "draft",
+      "name": "Draft",
+      "description": "Initial content creation phase",
+      "isInitial": true,
+      "isPublished": false,
+      "transitions": [
+        {
+          "toState": "review",
+          "roles": ["Editor", "SysAdmin"]
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "description": "Content being reviewed by editors",
+      "isInitial": false,
+      "isPublished": false,
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["Editor", "SysAdmin"],
+          "comment": "Requires revision"
+        },
+        {
+          "toState": "legal_review",
+          "roles": ["Editor", "SysAdmin"],
+          "comment": "Approved by editor, needs legal review"
+        },
+        {
+          "toState": "published",
+          "roles": ["SysAdmin"],
+          "comment": "Skip legal review (SysAdmin only)"
+        }
+      ]
+    },
+    {
+      "id": "legal_review",
+      "name": "Legal Review",
+      "description": "Content being reviewed by legal team",
+      "isInitial": false,
+      "isPublished": false,
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["LegalReviewer", "SysAdmin"],
+          "comment": "Rejected by legal"
+        },
+        {
+          "toState": "approved",
+          "roles": ["LegalReviewer", "SysAdmin"],
+          "comment": "Approved by legal"
+        }
+      ]
+    },
+    {
+      "id": "approved",
+      "name": "Approved",
+      "description": "Content approved and ready for publication",
+      "isInitial": false,
+      "isPublished": false,
+      "transitions": [
+        {
+          "toState": "published",
+          "roles": ["SysAdmin"],
+          "comment": "Final publication (SysAdmin only)"
+        },
+        {
+          "toState": "draft",
+          "roles": ["SysAdmin"],
+          "comment": "Send back to draft if needed"
+        }
+      ]
+    },
+    {
+      "id": "published",
+      "name": "Published",
+      "description": "Content is live on the site",
+      "isInitial": false,
+      "isPublished": true,
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["Editor", "SysAdmin"],
+          "comment": "Return to draft for revisions"
+        },
+        {
+          "toState": "archived",
+          "roles": ["SysAdmin"],
+          "comment": "Archive content"
+        }
+      ]
+    },
+    {
+      "id": "archived",
+      "name": "Archived",
+      "description": "Content is no longer active",
+      "isInitial": false,
+      "isPublished": false,
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["SysAdmin"],
+          "comment": "Restore from archive"
+        }
+      ]
+    }
+  ]
+}

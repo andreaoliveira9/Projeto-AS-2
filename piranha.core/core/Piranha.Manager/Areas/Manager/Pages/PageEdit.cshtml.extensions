@@ -1,0 +1,43 @@
+@* Add the following inside the main content section near the other metadata panels *@
+
+@if (Model.WorkflowState != null)
+{
+    <div class="card">
+        @await Html.PartialAsync("EditorTemplates/WorkflowStateDisplay", Model.WorkflowState)
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <span>Workflow</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <p>No workflow has been configured for this content.</p>
+            <button type="button" class="btn btn-primary" id="initWorkflowBtn">Initialize Workflow</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('initWorkflowBtn').addEventListener('click', function() {
+                // Initialize workflow
+                var contentId = '@Model.Id';
+                if (contentId) {
+                    piranha.api.post({
+                        url: '@Url.Action("Init", "WorkflowApi", new { area = "Manager" })/' + contentId + '/Standard Editorial Workflow',
+                        success: function() {
+                            piranha.notifications.success('Workflow initialized successfully');
+                            window.location.reload();
+                        },
+                        error: function() {
+                            piranha.notifications.error('Failed to initialize workflow');
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+}

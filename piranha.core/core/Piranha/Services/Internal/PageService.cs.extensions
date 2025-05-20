@@ -1,0 +1,93 @@
+using Microsoft.Extensions.Logging;
+using Piranha.Models;
+using Piranha.Repositories;
+using Piranha.Services;
+using System;
+using System.Threading.Tasks;
+
+namespace Piranha.Services.Internal;
+
+/// <summary>
+/// Extension of the page service to respect workflow states.
+/// </summary>
+public partial class PageService
+{
+    private readonly IContentWorkflowRepository _workflowRepo;
+    private readonly IWorkflowService _workflowService;
+
+    /// <summary>
+    /// Publish the page with the given id.
+    /// </summary>
+    /// <param name="id">The unique id</param>
+    /// <param name="username">The user that is publishing the page</param>
+    /// <returns>The page</returns>
+    public async Task<T> PublishAsync<T>(Guid id, string username = null) where T : PageBase
+    {
+        // First check if this page has a workflow state
+        var workflowState = await _workflowRepo.GetByContentIdAsync(id);
+
+        if (workflowState != null)
+        {
+            // Get the workflow definition
+            var workflow = await _workflowService.GetWorkflowAsync(workflowState.WorkflowName);
+
+            if (workflow != null)
+            {
+                // Get the current state
+                var currentState = workflow.GetState(workflowState.CurrentStateId);
+
+                // Only publish if current state is published
+                if (currentState == null || !currentState.IsPublished)
+                {
+                    // Get the published state
+                    var publishedState = workflow.PublishedState;
+
+                    if (publishedState != null)
+                    {
+                        throw new UnauthorizedAccessException($"The page is not in a published state. Current state: {currentState?.Name ?? workflowState.CurrentStateId}. Please transition to '{publishedState.Name}' state before publishing.");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"The workflow '{workflowState.WorkflowName}' does not have a published state defined.");
+                    }
+                }
+            }
+        }
+
+        // Continue with normal publication process
+        return await base.PublishAsync<T>(id, username);
+    }
+
+    /// <summary>
+    /// Unpublish the page with the given id.
+    /// </summary>
+    /// <param name="id">The unique id</param>
+    /// <param name="username">The user that is unpublishing the page</param>
+    /// <returns>The page</returns>
+    public async Task<T> UnpublishAsync<T>(Guid id, string username = null) where T : PageBase
+    {
+        // First check if this page has a workflow state
+        var workflowState = await _workflowRepo.GetByContentIdAsync(id);
+
+        if (workflowState != null)
+        {
+            // Get the workflow definition
+            var workflow = await _workflowService.GetWorkflowAsync(workflowState.WorkflowName);
+
+            if (workflow != null)
+            {
+                // When unpublishing, transition to draft state
+                var draftState = workflow.States.FirstOrDefault(s => s.Id == "draft");
+
+                if (draftState != null)
+                {
+                    // Add a record of this transition
+                    await _workflowService.TransitionAsync(id, draftState.Id, username, "Content unpublished");
+                }
+            }
+        }
+
+        // Continue with normal unpublication process
+        return await base.UnpublishAsync<T>(id, username);
+    }
+}

@@ -1,0 +1,104 @@
+{
+  "workflowName": "Standard Editorial Workflow",
+  "description": "Standard editorial workflow with draft, review, approval, and publish stages",
+  "states": [
+    {
+      "id": "draft",
+      "name": "Draft",
+      "description": "Initial content creation phase",
+      "isInitial": true,
+      "transitions": [
+        {
+          "toState": "review",
+          "roles": ["Editor", "Admin"]
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "description": "Content being reviewed by editors",
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["Editor", "Admin"],
+          "comment": "Requires revision"
+        },
+        {
+          "toState": "legal_review",
+          "roles": ["Editor", "Admin"],
+          "comment": "Approved by editor, needs legal review"
+        },
+        {
+          "toState": "published",
+          "roles": ["Admin"],
+          "comment": "Skip legal review (Admin only)"
+        }
+      ]
+    },
+    {
+      "id": "legal_review",
+      "name": "Legal Review",
+      "description": "Content being reviewed by legal team",
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["LegalReviewer", "Admin"],
+          "comment": "Rejected by legal"
+        },
+        {
+          "toState": "approved",
+          "roles": ["LegalReviewer", "Admin"],
+          "comment": "Approved by legal"
+        }
+      ]
+    },
+    {
+      "id": "approved",
+      "name": "Approved",
+      "description": "Content approved and ready for publication",
+      "transitions": [
+        {
+          "toState": "published",
+          "roles": ["Admin"],
+          "comment": "Final publication (Admin only)"
+        },
+        {
+          "toState": "draft",
+          "roles": ["Admin"],
+          "comment": "Send back to draft if needed"
+        }
+      ]
+    },
+    {
+      "id": "published",
+      "name": "Published",
+      "description": "Content is live on the site",
+      "isPublished": true,
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["Editor", "Admin"],
+          "comment": "Return to draft for revisions"
+        },
+        {
+          "toState": "archived",
+          "roles": ["Admin"],
+          "comment": "Archive content"
+        }
+      ]
+    },
+    {
+      "id": "archived",
+      "name": "Archived",
+      "description": "Content is no longer active",
+      "transitions": [
+        {
+          "toState": "draft",
+          "roles": ["Admin"],
+          "comment": "Restore from archive"
+        }
+      ]
+    }
+  ]
+}
