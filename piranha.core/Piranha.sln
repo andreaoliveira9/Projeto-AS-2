@@ -4,9 +4,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 16.0.28729.10
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "core", "core", "{42A64587-89B5-48F2-84D4-85B97F7847F1}"
-	ProjectSection(SolutionItems) = preProject
-		core\Piranha.EditorialWorkflow\obj\project.nuget.cache = core\Piranha.EditorialWorkflow\obj\project.nuget.cache
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{A82A5922-BF05-4DD7-A2C1-DD22F1AD6A57}"
 EndProject
@@ -77,8 +74,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Piranha.AspNetCore.Hosting", "core\Piranha.AspNetCore.Hosting\Piranha.AspNetCore.Hosting.csproj", "{8AFA0D7F-BDD9-41E0-BC69-B2B762516F33}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Piranha.EditorialWorkflow", "core\Piranha.EditorialWorkflow\Piranha.EditorialWorkflow.csproj", "{412C3EA6-6216-4A5B-94A3-3CFBA8E49ED1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Piranha.EditorialWorkflow.Tests", "test\Piranha.EditorialWorkflow.Tests\Piranha.EditorialWorkflow.Tests.csproj", "{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -414,18 +409,6 @@ Global
 		{412C3EA6-6216-4A5B-94A3-3CFBA8E49ED1}.Release|x64.Build.0 = Release|Any CPU
 		{412C3EA6-6216-4A5B-94A3-3CFBA8E49ED1}.Release|x86.ActiveCfg = Release|Any CPU
 		{412C3EA6-6216-4A5B-94A3-3CFBA8E49ED1}.Release|x86.Build.0 = Release|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Debug|x64.Build.0 = Debug|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Debug|x86.Build.0 = Debug|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Release|x64.ActiveCfg = Release|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Release|x64.Build.0 = Release|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Release|x86.ActiveCfg = Release|Any CPU
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -458,7 +441,6 @@ Global
 		{A88D6D8D-725E-494F-91CD-440D87BFF21B} = {42A64587-89B5-48F2-84D4-85B97F7847F1}
 		{8AFA0D7F-BDD9-41E0-BC69-B2B762516F33} = {42A64587-89B5-48F2-84D4-85B97F7847F1}
 		{412C3EA6-6216-4A5B-94A3-3CFBA8E49ED1} = {42A64587-89B5-48F2-84D4-85B97F7847F1}
-		{FD78EA6D-2692-4B6B-9BDF-FE1AE467A343} = {DE1913AC-4AA3-4F66-83F1-615710D8367B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CF88AA05-D127-4707-8214-A230F0DA569B}
