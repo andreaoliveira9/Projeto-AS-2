@@ -92,8 +92,8 @@ public sealed class WorkflowInstance
 /// </summary>
 public enum WorkflowInstanceStatus
 {
-    Active = 1,
-    Completed = 2,
-    Cancelled = 3,
-    OnHold = 4
+    Active = 0,
+    Completed = 1,
+    Cancelled = 2,
+    OnHold = 3
 }

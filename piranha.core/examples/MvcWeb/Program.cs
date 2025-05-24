@@ -4,6 +4,9 @@ using Piranha.AspNetCore.Identity.SQLite;
 using Piranha.AttributeBuilder;
 using Piranha.Data.EF.SQLite;
 using Piranha.Manager.Editor;
+using MvcWeb.Data;
+using Piranha.Data.EF.EditorialWorkflow;
+using Piranha.EditorialWorkflow.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +29,7 @@ builder.AddPiranha(options =>
     options.UseMemoryCache();
 
     var connectionString = builder.Configuration.GetConnectionString("piranha");
-    options.UseEF<SQLiteDb>(db => db.UseSqlite(connectionString));
+    options.UseEF<CustomSQLiteDb>(db => db.UseSqlite(connectionString));
     options.UseIdentityWithSeed<IdentitySQLiteDb>(db => db.UseSqlite(connectionString));
 
     /**
@@ -46,6 +49,9 @@ builder.AddPiranha(options =>
     options.LoginUrl = "login";
      */
 });
+
+builder.Services.AddEditorialWorkflowRepositories();
+builder.Services.AddScoped<IEditorialWorkflowService, EditorialWorkflowService>();
 
 var app = builder.Build();
 
@@ -72,5 +78,7 @@ app.UsePiranha(options =>
     options.UseTinyMCE();
     options.UseIdentity();
 });
+
+app.MapControllers();
 
 app.Run();

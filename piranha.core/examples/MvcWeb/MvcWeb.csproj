@@ -16,6 +16,15 @@
     <ProjectReference Include="..\..\core\Piranha.Manager.TinyMCE\Piranha.Manager.TinyMCE.csproj" />
     <ProjectReference Include="..\..\data\Piranha.Data.EF.SQLite\Piranha.Data.EF.SQLite.csproj" />
     <ProjectReference Include="..\..\identity\Piranha.AspNetCore.Identity.SQLite\Piranha.AspNetCore.Identity.SQLite.csproj" />
+    <ProjectReference Include="..\..\core\Piranha.EditorialWorkflow\Piranha.EditorialWorkflow.csproj" />
+    <ProjectReference Include="..\..\data\Piranha.Data.EF.EditorialWorkflow\Piranha.Data.EF.EditorialWorkflow.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
