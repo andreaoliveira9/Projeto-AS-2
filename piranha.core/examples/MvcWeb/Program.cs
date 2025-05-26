@@ -26,7 +26,7 @@ builder.AddPiranha(options =>
     options.UseEditorialWorkflow();
     
     // Register EF repositories
-    builder.Services.AddEditorialWorkflowRepositories();
+    options.UseEditorialWorkflowEF();
 
     options.UseFileStorage(naming: Piranha.Local.FileStorageNaming.UniqueFolderNames);
     options.UseImageSharp();
