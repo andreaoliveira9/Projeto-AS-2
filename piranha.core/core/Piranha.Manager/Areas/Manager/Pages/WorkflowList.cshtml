@@ -12,6 +12,7 @@
     <script>
         piranha.workflow = {};
         piranha.workflow.loading = true;
+        piranha.workflow.currentWorkflows = [];
 
         piranha.workflow.load = function () {
             console.log('piranha.workflow.load: Starting workflow load operation');
@@ -19,7 +20,7 @@
             piranha.workflow.loading = true;
             piranha.workflow.updateLoadingState();
             
-            var url = piranha.baseUrl + 'api/workflow/definitions';
+            var url = piranha.baseUrl + 'api/workflow/definitions/with-stats';
             console.log('piranha.workflow.load: Making API call to:', url);
             
             fetch(url, {
@@ -95,6 +96,9 @@
                 return;
             }
 
+            // Store workflows data for later use
+            piranha.workflow.currentWorkflows = workflows || [];
+
             var html = '';
             
             if (workflows && workflows.length > 0) {
@@ -110,6 +114,7 @@
                     html += '<p class="card-text text-muted mb-2">' + (workflow.description || 'No description') + '</p>';
                     html += '<small class="text-muted">';
                     html += '<i class="fas fa-layer-group me-1"></i>States: ' + (workflow.states ? workflow.states.length : 0);
+                    html += ' | <i class="fas fa-tasks me-1"></i>Instances: ' + (workflow.instances ? workflow.instances.length : 0);
                     if (workflow.isActive !== undefined) {
                         html += ' | <i class="fas ' + (workflow.isActive ? 'fa-check-circle text-success' : 'fa-times-circle text-danger') + ' me-1"></i>' + (workflow.isActive ? 'Active' : 'Inactive');
                     }
@@ -119,6 +124,7 @@
                     html += '<div class="btn-group" role="group">';
                     html += '<button type="button" class="btn btn-primary btn-sm" onclick="piranha.workflow.edit(\'' + workflow.id + '\')"><i class="fas fa-edit me-1"></i>Edit</button>';
                     html += '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="piranha.workflow.configure(\'' + workflow.id + '\')"><i class="fas fa-cog me-1"></i>States</button>';
+                    html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="piranha.workflow.delete(\'' + workflow.id + '\')"><i class="fas fa-trash me-1"></i>Delete</button>';
                     html += '</div>';
                     html += '</div>';
                     html += '</div>';
@@ -181,7 +187,9 @@
                     piranha.notifications.push({
                         type: 'error',
                         title: 'Error',
-                        body: 'Failed to load workflow: ' + error.message
+                        body: 'Failed to load workflow: ' + error.message,
+                        hide: true,
+                        timeout: 5000
                     });
                 });
         };
@@ -195,8 +203,82 @@
             document.getElementById('workflow-active').checked = workflow.isActive !== false;
             document.getElementById('workflow-modal').setAttribute('data-workflow-id', workflow.id || '');
             
+            // Check if we should disable the Active checkbox
+            piranha.workflow.updateActiveCheckboxState(workflow);
+            
             // Use jQuery to show modal (Piranha style)
             $('#workflow-modal').modal('show');
+        };
+
+        piranha.workflow.updateActiveCheckboxState = function (workflow) {
+            var activeCheckbox = document.getElementById('workflow-active');
+            var activeLabel = document.querySelector('label[for="workflow-active"]');
+            var currentWorkflows = piranha.workflow.currentWorkflows || [];
+            
+            // Check if this is an edit operation (workflow has an ID)
+            var isEditMode = workflow && workflow.id;
+            
+            // Only apply restrictions when editing, not when creating
+            if (!isEditMode) {
+                console.log('updateActiveCheckboxState: Create mode - checkbox enabled');
+                if (activeCheckbox) {
+                    activeCheckbox.disabled = false;
+                    activeCheckbox.parentElement.style.opacity = '1';
+                    activeCheckbox.parentElement.style.cursor = 'pointer';
+                }
+                if (activeLabel) {
+                    activeLabel.innerHTML = 'Active';
+                }
+                return;
+            }
+            
+            // Count total workflows and active workflows
+            var totalWorkflows = currentWorkflows.length;
+            var activeWorkflowCount = currentWorkflows.filter(function(w) { return w.isActive; }).length;
+            
+            var isEditingActiveWorkflow = workflow.isActive;
+            var isOnlyWorkflow = totalWorkflows === 1;
+            var isOnlyActiveWorkflow = isEditingActiveWorkflow && activeWorkflowCount === 1;
+            
+            console.log('updateActiveCheckboxState: Edit mode - totalWorkflows=' + totalWorkflows + 
+                       ', activeWorkflowCount=' + activeWorkflowCount + 
+                       ', isEditingActiveWorkflow=' + isEditingActiveWorkflow + 
+                       ', isOnlyWorkflow=' + isOnlyWorkflow + 
+                       ', isOnlyActiveWorkflow=' + isOnlyActiveWorkflow);
+            
+            // Disable only if this is the only workflow OR if this is the only active workflow
+            var shouldDisable = isOnlyWorkflow || isOnlyActiveWorkflow;
+            
+            if (activeCheckbox) {
+                activeCheckbox.disabled = shouldDisable;
+                
+                if (shouldDisable) {
+                    // Ensure it stays checked when disabled
+                    activeCheckbox.checked = true;
+                    
+                    // Add visual styling for disabled state
+                    activeCheckbox.parentElement.style.opacity = '0.6';
+                    activeCheckbox.parentElement.style.cursor = 'not-allowed';
+                    
+                    // Update label with explanation
+                    if (activeLabel) {
+                        var originalText = 'Active';
+                        var explanationText = isOnlyWorkflow ? 
+                            ' (required - only workflow)' : 
+                            ' (required - last active workflow)';
+                        activeLabel.innerHTML = originalText + '<small class="text-muted">' + explanationText + '</small>';
+                    }
+                } else {
+                    // Reset styling for enabled state
+                    activeCheckbox.parentElement.style.opacity = '1';
+                    activeCheckbox.parentElement.style.cursor = 'pointer';
+                    
+                    // Reset label
+                    if (activeLabel) {
+                        activeLabel.innerHTML = 'Active';
+                    }
+                }
+            }
         };
 
         piranha.workflow.save = function () {
@@ -220,9 +302,35 @@
                 piranha.notifications.push({
                     type: 'warning',
                     title: 'Validation Error',
-                    body: 'Please enter a workflow name.'
+                    body: 'Please enter a workflow name.',
+                    hide: true,
+                    timeout: 4000
                 });
                 return;
+            }
+            
+            // If deactivating a workflow, check if it's allowed
+            if (isEdit && !workflow.isActive) {
+                var currentWorkflows = piranha.workflow.currentWorkflows || [];
+                var activeWorkflowCount = currentWorkflows.filter(function(w) { return w.isActive; }).length;
+                var isCurrentlyActive = currentWorkflows.find(function(w) { return w.id === workflowId; });
+                
+                if (isCurrentlyActive && isCurrentlyActive.isActive && activeWorkflowCount === 1) {
+                    console.warn('piranha.workflow.save: Cannot deactivate the last active workflow');
+                    piranha.notifications.push({
+                        type: 'warning',
+                        title: 'Validation Error',
+                        body: 'Cannot deactivate the last active workflow. At least one workflow must remain active.',
+                        hide: true,
+                        timeout: 5000
+                    });
+                    return;
+                }
+                
+                var confirmed = confirm('Are you sure you want to deactivate this workflow?\n\nNote: At least one workflow must remain active in the system.');
+                if (!confirmed) {
+                    return;
+                }
             }
             
             if (isEdit) {
@@ -281,7 +389,9 @@
                         piranha.notifications.push({
                             type: 'success',
                             title: 'Success',
-                            body: isEdit ? 'Workflow updated successfully' : 'Workflow created successfully'
+                            body: isEdit ? 'Workflow updated successfully' : 'Workflow created successfully',
+                            hide: true,
+                            timeout: 4000
                         });
                         
                         console.log('piranha.workflow.save: Success notification sent, reloading list');
@@ -314,7 +424,14 @@
                             // Try to parse error as JSON
                             try {
                                 var errorData = JSON.parse(responseText);
-                                throw new Error(errorData.message || errorData.error || 'Server error');
+                                var errorMessage = errorData.message || errorData.error || 'Server error';
+                                
+                                // Handle specific business rule violations
+                                if (errorMessage.includes('Cannot deactivate the last active workflow')) {
+                                    throw new Error('Cannot deactivate the last active workflow. At least one workflow must remain active.');
+                                }
+                                
+                                throw new Error(errorMessage);
                             } catch (parseError) {
                                 throw new Error('Server error: ' + response.status + ' - ' + responseText);
                             }
@@ -329,7 +446,9 @@
                 piranha.notifications.push({
                     type: 'error',
                     title: 'Error',
-                    body: 'Failed to save workflow: ' + error.message
+                    body: 'Failed to save workflow: ' + error.message,
+                    hide: true,
+                    timeout: 5000
                 });
             });
         };
@@ -337,6 +456,66 @@
         piranha.workflow.configure = function (id) {
             window.location.href = piranha.baseUrl + 'manager/workflow/' + id + '/states';
         };
+
+        piranha.workflow.delete = function (id) {
+            if (!confirm('Are you sure you want to delete this workflow? This action cannot be undone.')) {
+                return;
+            }
+
+            fetch(piranha.baseUrl + 'api/workflow/definitions/' + id, {
+                method: 'DELETE',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+            .then(function (response) {
+                if (response.ok || response.status === 204) {
+                    // Show success notification with auto-dismiss
+                    piranha.notifications.push({
+                        type: 'success',
+                        title: 'Success',
+                        body: 'Workflow deleted successfully',
+                        hide: true,
+                        timeout: 4000
+                    });
+                    
+                    // Reload the data
+                    piranha.workflow.load();
+                } else {
+                    return response.json().then(function(errorData) {
+                        throw new Error(errorData.message || 'Failed to delete workflow');
+                    });
+                }
+            })
+            .catch(function (error) {
+                console.error('Error deleting workflow:', error);
+                piranha.notifications.push({
+                    type: 'error',
+                    title: 'Error',
+                    body: 'Failed to delete workflow: ' + error.message,
+                    hide: true,
+                    timeout: 5000
+                });
+            });
+        };
+
+        piranha.workflow.cancelModal = function() {
+            $('#workflow-modal').modal('hide');
+        };
+
+        // Reset checkbox state when modal is hidden
+        $(document).on('hidden.bs.modal', '#workflow-modal', function (event) {
+            var activeCheckbox = document.getElementById('workflow-active');
+            var activeLabel = document.querySelector('label[for="workflow-active"]');
+            
+            if (activeCheckbox) {
+                activeCheckbox.disabled = false;
+                activeCheckbox.parentElement.style.opacity = '1';
+                activeCheckbox.parentElement.style.cursor = 'pointer';
+            }
+            
+            if (activeLabel) {
+                activeLabel.innerHTML = 'Active';
+            }
+        });
 
         piranha.workflow.testDatabase = function () {
             console.log('piranha.workflow.testDatabase: Starting database test');
@@ -421,9 +600,9 @@
                 <button class="btn btn-primary btn-labeled" type="button" onclick="piranha.workflow.create()">
                     <i class="fas fa-plus"></i>@Localizer.General["Create"] Workflow
                 </button>
-                <button class="btn btn-secondary btn-labeled ms-2" type="button" onclick="piranha.workflow.testDatabase()">
+                @* <button class="btn btn-secondary btn-labeled ms-2" type="button" onclick="piranha.workflow.testDatabase()">
                     <i class="fas fa-database"></i>Test Database
-                </button>
+                </button> *@
             </div>
         </div>
     </div>
@@ -453,7 +632,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="workflow-modal-title">Create Workflow</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <form id="workflowForm">
@@ -474,7 +655,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer.General["Cancel"]</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="piranha.workflow.cancelModal()">@Localizer.General["Cancel"]</button>
                 <button type="button" class="btn btn-primary" onclick="piranha.workflow.save()">@Localizer.General["Save"]</button>
             </div>
         </div>
@@ -502,5 +683,27 @@
     .top, .top-nav {
         opacity: 1 !important;
         visibility: visible !important;
+    }
+    
+    /* Styling for disabled checkbox container */
+    .form-check.disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .form-check.disabled .form-check-input {
+        cursor: not-allowed;
+    }
+    
+    .form-check.disabled .form-check-label {
+        cursor: not-allowed;
+        color: #6c757d;
+    }
+    
+    /* Styling for the explanation text in labels */
+    .form-check-label small {
+        display: block;
+        font-style: italic;
+        margin-top: 2px;
     }
 </style>

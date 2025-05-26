@@ -9,16 +9,23 @@ public interface IEditorialWorkflowService
     Task<WorkflowDefinition> UpdateWorkflowDefinitionAsync(WorkflowDefinition definition);
     Task<IEnumerable<WorkflowDefinition>> GetAllWorkflowDefinitionsAsync();
     Task<WorkflowDefinition> GetWorkflowDefinitionByIdAsync(Guid id);
+    Task DeleteWorkflowDefinitionAsync(Guid id);
+    Task<bool> CanDeleteWorkflowDefinitionAsync(Guid id);
+    Task<IEnumerable<WorkflowDefinition>> GetAllWorkflowDefinitionsWithStatsAsync();
 
     // Workflow States
     Task<WorkflowState> CreateWorkflowStateAsync(WorkflowState state);
     Task<WorkflowState> UpdateWorkflowStateAsync(WorkflowState state);
+    Task<WorkflowState> GetWorkflowStateByIdAsync(Guid id);
     Task<IEnumerable<WorkflowState>> GetWorkflowStatesByDefinitionAsync(Guid definitionId);
+    Task DeleteWorkflowStateAsync(Guid id);
 
     // Transition Rules
     Task<TransitionRule> CreateTransitionRuleAsync(TransitionRule rule);
     Task<TransitionRule> UpdateTransitionRuleAsync(TransitionRule rule);
+    Task<TransitionRule> GetTransitionRuleByIdAsync(Guid id);
     Task<IEnumerable<TransitionRule>> GetTransitionRulesByDefinitionAsync(Guid definitionId);
+    Task DeleteTransitionRuleAsync(Guid id);
 
     // Workflow Instances
     Task<WorkflowInstance> CreateWorkflowInstanceAsync(WorkflowInstance instance);
@@ -30,4 +37,5 @@ public interface IEditorialWorkflowService
 
     // Debug methods
     Task<bool> TestDatabaseConnectionAsync();
+    Task<IEnumerable<Piranha.AspNetCore.Identity.Data.Role>> GetSystemRolesAsync();
 } 

@@ -13,12 +13,35 @@
         piranha.workflowStates = {};
         piranha.workflowStates.workflowId = '@RouteData.Values["id"]';
         piranha.workflowStates.loading = true;
+        piranha.workflowStates.currentStates = []; // Cache loaded states
+        piranha.workflowStates.currentRules = []; // Cache loaded rules
+        piranha.workflowStates.systemRoles = []; // Cache system roles
 
         piranha.workflowStates.load = function () {
             piranha.workflowStates.loading = true;
             piranha.workflowStates.updateLoadingState();
             
             console.log('Loading workflow states for ID:', piranha.workflowStates.workflowId);
+            
+            // Load system roles first
+            fetch(piranha.baseUrl + 'api/workflow/debug/roles', {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Failed to load roles: ' + response.status);
+                    }
+                    return response.json(); 
+                })
+                .then(function (roles) {
+                    console.log('Roles loaded:', roles);
+                    piranha.workflowStates.systemRoles = roles || [];
+                })
+                .catch(function (error) {
+                    console.error('Error loading roles:', error);
+                    piranha.workflowStates.systemRoles = [];
+                });
             
             // Load workflow definition
             fetch(piranha.baseUrl + 'api/workflow/definitions/' + piranha.workflowStates.workflowId, {
@@ -41,7 +64,9 @@
                     piranha.notifications.push({
                         type: 'error',
                         title: 'Error',
-                        body: 'Failed to load workflow: ' + error.message
+                        body: 'Failed to load workflow: ' + error.message,
+                        hide: true,
+                        timeout: 5000
                     });
                 });
 
@@ -58,6 +83,7 @@
                 })
                 .then(function (states) {
                     console.log('States loaded:', states);
+                    piranha.workflowStates.currentStates = states || [];
                     piranha.workflowStates.updateStatesList(states);
                 })
                 .catch(function (error) {
@@ -78,6 +104,7 @@
                 })
                 .then(function (rules) {
                     console.log('Rules loaded:', rules);
+                    piranha.workflowStates.currentRules = rules || [];
                     piranha.workflowStates.updateTransitionsList(rules);
                 })
                 .catch(function (error) {
@@ -88,6 +115,43 @@
                     piranha.workflowStates.loading = false;
                     piranha.workflowStates.updateLoadingState();
                 });
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
         };
 
         piranha.workflowStates.updateLoadingState = function() {
@@ -101,13 +165,55 @@
             }
         };
 
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
         piranha.workflowStates.updateStatesList = function (states) {
             console.log('Updating states list with:', states);
             
             var html = '';
             
             if (states && states.length > 0) {
-                states.sort(function(a, b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
+                // Sort by created date (oldest to newest) instead of sortOrder
+                states.sort(function(a, b) { 
+                    var dateA = new Date(a.created || '1900-01-01');
+                    var dateB = new Date(b.created || '1900-01-01');
+                    return dateA - dateB;
+                });
                 
                 for (var i = 0; i < states.length; i++) {
                     var state = states[i];
@@ -147,12 +253,55 @@
             document.getElementById('states-list').innerHTML = html;
         };
 
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
         piranha.workflowStates.updateTransitionsList = function (rules) {
             console.log('Updating transitions list with:', rules);
             
             var html = '';
             
             if (rules && rules.length > 0) {
+                // Sort by created date (oldest to newest) instead of sortOrder
+                rules.sort(function(a, b) { 
+                    var dateA = new Date(a.created || '1900-01-01');
+                    var dateB = new Date(b.created || '1900-01-01');
+                    return dateA - dateB;
+                });
                 for (var i = 0; i < rules.length; i++) {
                     var rule = rules[i];
                     var roles = [];
@@ -164,12 +313,27 @@
                     
                     var rolesText = roles.length > 0 ? roles.join(', ') : 'No roles specified';
                     
+                    // Get state names for display
+                    var fromStateName = 'Unknown';
+                    var toStateName = 'Unknown';
+                    
+                    if (piranha.workflowStates.currentStates) {
+                        var fromState = piranha.workflowStates.currentStates.find(function(s) { return s.id === rule.fromStateId; });
+                        var toState = piranha.workflowStates.currentStates.find(function(s) { return s.id === rule.toStateId; });
+                        
+                        if (fromState) fromStateName = fromState.name;
+                        if (toState) toStateName = toState.name;
+                    }
+                    
                     html += '<div class="card mb-2">';
                     html += '<div class="card-body">';
                     html += '<div class="row align-items-center">';
                     html += '<div class="col">';
-                    html += '<h6 class="card-title mb-1">Transition Rule</h6>';
+                    html += '<h6 class="card-title mb-1">' + fromStateName + ' → ' + toStateName + '</h6>';
                     html += '<p class="card-text text-muted mb-1">Allowed Roles: ' + rolesText + '</p>';
+                    if (rule.description) {
+                        html += '<p class="card-text text-muted mb-1">' + rule.description + '</p>';
+                    }
                     if (rule.commentTemplate) {
                         html += '<p class="card-text text-muted mb-1">Comment Template: ' + rule.commentTemplate + '</p>';
                     }
@@ -197,11 +361,93 @@
             document.getElementById('transitions-list').innerHTML = html;
         };
 
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
         piranha.workflowStates.createState = function () {
             piranha.workflowStates.openStateModal();
         };
 
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
         piranha.workflowStates.editState = function (id) {
+            // Find state in cached data first
+            var state = piranha.workflowStates.currentStates.find(function(s) { return s.id === id; });
+            if (state) {
+                piranha.workflowStates.openStateModal(state);
+                return;
+            }
+            
+            // Fallback to API call if not in cache
             fetch(piranha.baseUrl + 'api/workflow/states/' + id, {
                 method: 'GET',
                 headers: piranha.utils.antiForgeryHeaders()
@@ -220,9 +466,48 @@
                     piranha.notifications.push({
                         type: 'error',
                         title: 'Error',
-                        body: 'Failed to load state: ' + error.message
+                        body: 'Failed to load state: ' + error.message,
+                        hide: true,
+                        timeout: 5000
                     });
                 });
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
         };
 
         piranha.workflowStates.openStateModal = function (state) {
@@ -233,9 +518,46 @@
                 isInitial: false, 
                 isPublished: false, 
                 isFinal: false,
-                sortOrder: 1,
-                colorCode: '#6c757d'
+                colorCode: '#6c757d',
+                workflowDefinitionId: piranha.workflowStates.workflowId
             };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
             
             document.getElementById('state-modal-title').textContent = state.id ? 'Edit State' : 'Create State';
             document.getElementById('state-id').value = state.stateId || '';
@@ -244,12 +566,48 @@
             document.getElementById('state-initial').checked = state.isInitial === true;
             document.getElementById('state-published').checked = state.isPublished === true;
             document.getElementById('state-final').checked = state.isFinal === true;
-            document.getElementById('state-sort-order').value = state.sortOrder || 1;
             document.getElementById('state-color').value = state.colorCode || '#6c757d';
             document.getElementById('state-modal').setAttribute('data-state-id', state.id || '');
             
             // Use jQuery to show modal (Piranha style)
             $('#state-modal').modal('show');
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
         };
 
         piranha.workflowStates.saveState = function () {
@@ -263,16 +621,55 @@
                 isInitial: document.getElementById('state-initial').checked,
                 isPublished: document.getElementById('state-published').checked,
                 isFinal: document.getElementById('state-final').checked,
-                sortOrder: parseInt(document.getElementById('state-sort-order').value) || 1,
+                sortOrder: 1, // Default value, not displayed in UI
                 colorCode: document.getElementById('state-color').value,
                 workflowDefinitionId: piranha.workflowStates.workflowId
             };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
             
             if (!state.stateId) {
                 piranha.notifications.push({
                     type: 'warning',
                     title: 'Validation Error',
-                    body: 'Please enter a state ID.'
+                    body: 'Please enter a state ID.',
+                    hide: true,
+                    timeout: 4000
                 });
                 return;
             }
@@ -281,17 +678,29 @@
                 piranha.notifications.push({
                     type: 'warning',
                     title: 'Validation Error',
-                    body: 'Please enter a state name.'
+                    body: 'Please enter a state name.',
+                    hide: true,
+                    timeout: 4000
                 });
                 return;
             }
             
             if (isEdit) {
                 state.id = stateId;
+                // Preserve the existing Created date if editing
+                var existingState = piranha.workflowStates.currentStates.find(function(s) { return s.id === stateId; });
+                if (existingState && existingState.created) {
+                    state.created = existingState.created;
+                }
+            } else {
+                // Set created date for new states
+                state.created = new Date().toISOString();
             }
 
             var url = piranha.baseUrl + 'api/workflow/states' + (isEdit ? '/' + stateId : '');
             var method = isEdit ? 'PUT' : 'POST';
+
+            console.log('Saving state:', state);
 
             fetch(url, {
                 method: method,
@@ -303,11 +712,13 @@
                     // Use jQuery to hide modal (Piranha style)
                     $('#state-modal').modal('hide');
                     
-                    // Show success notification
+                    // Show success notification with auto-dismiss
                     piranha.notifications.push({
                         type: 'success',
                         title: 'Success',
-                        body: isEdit ? 'State updated successfully' : 'State created successfully'
+                        body: isEdit ? 'State updated successfully' : 'State created successfully',
+                        hide: true,
+                        timeout: 4000  // Auto-hide after 4 seconds
                     });
                     
                     // Reload the data
@@ -323,16 +734,100 @@
                 piranha.notifications.push({
                     type: 'error',
                     title: 'Error',
-                    body: 'Failed to save state: ' + error.message
+                    body: 'Failed to save state: ' + error.message,
+                    hide: true,
+                    timeout: 5000
                 });
             });
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
         };
 
         piranha.workflowStates.createTransition = function () {
             piranha.workflowStates.openTransitionModal();
         };
 
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
         piranha.workflowStates.editTransition = function (id) {
+            // Find transition in cached data first
+            var transition = piranha.workflowStates.currentRules.find(function(r) { return r.id === id; });
+            if (transition) {
+                piranha.workflowStates.openTransitionModal(transition);
+                return;
+            }
+            
+            // Fallback to API call if not in cache
             fetch(piranha.baseUrl + 'api/workflow/rules/' + id, {
                 method: 'GET',
                 headers: piranha.utils.antiForgeryHeaders()
@@ -351,9 +846,48 @@
                     piranha.notifications.push({
                         type: 'error',
                         title: 'Error',
-                        body: 'Failed to load transition: ' + error.message
+                        body: 'Failed to load transition: ' + error.message,
+                        hide: true,
+                        timeout: 5000
                     });
                 });
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
         };
 
         piranha.workflowStates.openTransitionModal = function (transition) {
@@ -361,51 +895,304 @@
                 fromStateId: '', 
                 toStateId: '', 
                 allowedRoles: '[]', 
+                description: '',
                 commentTemplate: '', 
                 requiresComment: false,
-                isActive: true,
-                sortOrder: 1
+                isActive: true
             };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
             
             document.getElementById('transition-modal-title').textContent = transition.id ? 'Edit Transition' : 'Create Transition';
-            document.getElementById('transition-roles').value = '';
+            
+            // Populate state dropdowns
+            piranha.workflowStates.populateStateDropdowns();
+            
+            // Populate role checkboxes
+            piranha.workflowStates.populateRoleCheckboxes();
+            
+            // Set values
+            document.getElementById('transition-from-state').value = transition.fromStateId || '';
+            document.getElementById('transition-to-state').value = transition.toStateId || '';
+            document.getElementById('transition-description').value = transition.description || '';
+            
+            // Set role checkboxes based on existing data
             try {
                 var roles = JSON.parse(transition.allowedRoles || '[]');
-                document.getElementById('transition-roles').value = roles.join(', ');
+                // Clear all checkboxes first
+                var checkboxes = document.querySelectorAll('#transition-roles-checkboxes input[type="checkbox"]');
+                for (var i = 0; i < checkboxes.length; i++) {
+                    checkboxes[i].checked = false;
+                }
+                // Check the appropriate boxes
+                for (var i = 0; i < roles.length; i++) {
+                    var checkbox = document.querySelector('#transition-roles-checkboxes input[data-role-name="' + roles[i] + '"]');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                }
             } catch (e) {
-                document.getElementById('transition-roles').value = '';
+                console.error('Error setting role checkboxes:', e);
             }
             document.getElementById('transition-comment-template').value = transition.commentTemplate || '';
             document.getElementById('transition-requires-comment').checked = transition.requiresComment === true;
             document.getElementById('transition-active').checked = transition.isActive !== false;
-            document.getElementById('transition-sort-order').value = transition.sortOrder || 1;
             document.getElementById('transition-modal').setAttribute('data-transition-id', transition.id || '');
             
             // Use jQuery to show modal (Piranha style)
             $('#transition-modal').modal('show');
         };
 
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
+        piranha.workflowStates.populateStateDropdowns = function() {
+            var fromSelect = document.getElementById('transition-from-state');
+            var toSelect = document.getElementById('transition-to-state');
+            
+            // Clear existing options
+            fromSelect.innerHTML = '<option value="">Select source state...</option>';
+            toSelect.innerHTML = '<option value="">Select target state...</option>';
+            
+            // Populate with current states
+            if (piranha.workflowStates.currentStates && piranha.workflowStates.currentStates.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.currentStates.length; i++) {
+                    var state = piranha.workflowStates.currentStates[i];
+                    var option = '<option value="' + state.id + '">' + state.name + ' (' + state.stateId + ')</option>';
+                    fromSelect.innerHTML += option;
+                    toSelect.innerHTML += option;
+                }
+            }
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
         piranha.workflowStates.saveTransition = function () {
             var transitionId = document.getElementById('transition-modal').getAttribute('data-transition-id');
             var isEdit = transitionId && transitionId !== '';
             
-            var rolesText = document.getElementById('transition-roles').value.trim();
-            var roles = rolesText ? rolesText.split(',').map(function(r) { return r.trim(); }) : [];
+            var fromStateId = document.getElementById('transition-from-state').value;
+            var toStateId = document.getElementById('transition-to-state').value;
+            
+            // Get selected roles from checkboxes
+            var selectedRoles = [];
+            var checkboxes = document.querySelectorAll('#transition-roles-checkboxes input[type="checkbox"]:checked');
+            for (var i = 0; i < checkboxes.length; i++) {
+                selectedRoles.push(checkboxes[i].getAttribute('data-role-name'));
+            }
+            
+            if (!fromStateId) {
+                piranha.notifications.push({
+                    type: 'warning',
+                    title: 'Validation Error',
+                    body: 'Please select a source state.',
+                    hide: true,
+                    timeout: 4000
+                });
+                return;
+            }
+            
+            if (!toStateId) {
+                piranha.notifications.push({
+                    type: 'warning',
+                    title: 'Validation Error',
+                    body: 'Please select a target state.',
+                    hide: true,
+                    timeout: 4000
+                });
+                return;
+            }
+            
+            if (fromStateId === toStateId) {
+                piranha.notifications.push({
+                    type: 'warning',
+                    title: 'Validation Error',
+                    body: 'Source and target states must be different.',
+                    hide: true,
+                    timeout: 4000
+                });
+                return;
+            }
+            
+            if (selectedRoles.length === 0) {
+                piranha.notifications.push({
+                    type: 'warning',
+                    title: 'Validation Error',
+                    body: 'Please select at least one role.',
+                    hide: true,
+                    timeout: 4000
+                });
+                return;
+            }
             
             var transition = {
-                allowedRoles: JSON.stringify(roles),
+                fromStateId: fromStateId,
+                toStateId: toStateId,
+                description: document.getElementById('transition-description').value.trim(),
+                allowedRoles: JSON.stringify(selectedRoles),
                 commentTemplate: document.getElementById('transition-comment-template').value.trim(),
                 requiresComment: document.getElementById('transition-requires-comment').checked,
                 isActive: document.getElementById('transition-active').checked,
-                sortOrder: parseInt(document.getElementById('transition-sort-order').value) || 1
+                sortOrder: 1 // Default value, not displayed in UI
             };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
             
             if (isEdit) {
                 transition.id = transitionId;
+                // Preserve the existing Created date if editing
+                var existingTransition = piranha.workflowStates.currentRules.find(function(r) { return r.id === transitionId; });
+                if (existingTransition && existingTransition.created) {
+                    transition.created = existingTransition.created;
+                }
+            } else {
+                // Set created date for new transitions
+                transition.created = new Date().toISOString();
             }
 
             var url = piranha.baseUrl + 'api/workflow/rules' + (isEdit ? '/' + transitionId : '');
             var method = isEdit ? 'PUT' : 'POST';
+
+            console.log('Saving transition:', transition);
 
             fetch(url, {
                 method: method,
@@ -417,11 +1204,13 @@
                     // Use jQuery to hide modal (Piranha style)
                     $('#transition-modal').modal('hide');
                     
-                    // Show success notification
+                    // Show success notification with auto-dismiss
                     piranha.notifications.push({
                         type: 'success',
                         title: 'Success',
-                        body: isEdit ? 'Transition updated successfully' : 'Transition created successfully'
+                        body: isEdit ? 'Transition updated successfully' : 'Transition created successfully',
+                        hide: true,
+                        timeout: 4000  // Auto-hide after 4 seconds
                     });
                     
                     // Reload the data
@@ -437,9 +1226,202 @@
                 piranha.notifications.push({
                     type: 'error',
                     title: 'Error',
-                    body: 'Failed to save transition: ' + error.message
+                    body: 'Failed to save transition: ' + error.message,
+                    hide: true,
+                    timeout: 5000
                 });
             });
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
+        piranha.workflowStates.deleteState = function (id) {
+            if (!confirm('Are you sure you want to delete this state? This action cannot be undone.')) {
+                return;
+            }
+
+            fetch(piranha.baseUrl + 'api/workflow/states/' + id, {
+                method: 'DELETE',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+            .then(function (response) {
+                if (response.ok || response.status === 204) {
+                    // Show success notification with auto-dismiss
+                    piranha.notifications.push({
+                        type: 'success',
+                        title: 'Success',
+                        body: 'State deleted successfully',
+                        hide: true,
+                        timeout: 4000
+                    });
+                    
+                    // Reload the data
+                    piranha.workflowStates.load();
+                } else {
+                    return response.json().then(function(errorData) {
+                        throw new Error(errorData.message || 'Failed to delete state');
+                    });
+                }
+            })
+            .catch(function (error) {
+                console.error('Error deleting state:', error);
+                piranha.notifications.push({
+                    type: 'error',
+                    title: 'Error',
+                    body: 'Failed to delete state: ' + error.message,
+                    hide: true,
+                    timeout: 5000
+                });
+            });
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+
+        piranha.workflowStates.deleteTransition = function (id) {
+            if (!confirm('Are you sure you want to delete this transition rule? This action cannot be undone.')) {
+                return;
+            }
+
+            fetch(piranha.baseUrl + 'api/workflow/rules/' + id, {
+                method: 'DELETE',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+            .then(function (response) {
+                if (response.ok || response.status === 204) {
+                    // Show success notification with auto-dismiss
+                    piranha.notifications.push({
+                        type: 'success',
+                        title: 'Success',
+                        body: 'Transition rule deleted successfully',
+                        hide: true,
+                        timeout: 4000
+                    });
+                    
+                    // Reload the data
+                    piranha.workflowStates.load();
+                } else {
+                    return response.json().then(function(errorData) {
+                        throw new Error(errorData.message || 'Failed to delete transition rule');
+                    });
+                }
+            })
+            .catch(function (error) {
+                console.error('Error deleting transition rule:', error);
+                piranha.notifications.push({
+                    type: 'error',
+                    title: 'Error',
+                    body: 'Failed to delete transition rule: ' + error.message,
+                    hide: true,
+                    timeout: 5000
+                });
+            });
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
         };
 
         // Load data on page ready
@@ -454,8 +1436,91 @@
         });
 
         $(document).on('shown.bs.modal', '#transition-modal', function (event) {
-            $(this).find('#transition-roles').focus();
+            $(this).find('#transition-from-state').focus();
         });
+        
+        // Ensure cancel buttons work (backup handlers)
+        piranha.workflowStates.cancelStateModal = function() {
+            $('#state-modal').modal('hide');
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
+        
+        piranha.workflowStates.cancelTransitionModal = function() {
+            $('#transition-modal').modal('hide');
+        };
+
+        piranha.workflowStates.populateRoleCheckboxes = function() {
+            var rolesContainer = document.getElementById('transition-roles-checkboxes');
+            
+            if (!rolesContainer) return;
+            
+            // Clear existing checkboxes
+            rolesContainer.innerHTML = '';
+            
+            // Populate with system roles
+            if (piranha.workflowStates.systemRoles && piranha.workflowStates.systemRoles.length > 0) {
+                for (var i = 0; i < piranha.workflowStates.systemRoles.length; i++) {
+                    var role = piranha.workflowStates.systemRoles[i];
+                    
+                    var checkboxDiv = document.createElement('div');
+                    checkboxDiv.className = 'form-check form-check-inline';
+                    
+                    var checkbox = document.createElement('input');
+                    checkbox.className = 'form-check-input';
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'role-' + role.name.toLowerCase();
+                    checkbox.value = role.name;
+                    checkbox.setAttribute('data-role-name', role.name);
+                    
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.setAttribute('for', checkbox.id);
+                    label.textContent = role.name;
+                    
+                    checkboxDiv.appendChild(checkbox);
+                    checkboxDiv.appendChild(label);
+                    rolesContainer.appendChild(checkboxDiv);
+                }
+            } else {
+                rolesContainer.innerHTML = '<div class="text-muted">No roles available</div>';
+            }
+        };
     </script>
 }
 
@@ -534,7 +1599,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="state-modal-title">Create State</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <form id="stateForm">
@@ -552,11 +1619,7 @@
                         <textarea class="form-control" id="state-description" rows="2" maxlength="500"></textarea>
                     </div>
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="state-sort-order" class="form-label">Sort Order</label>
-                            <input type="number" class="form-control" id="state-sort-order" value="1" min="1">
-                        </div>
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label for="state-color" class="form-label">Color Code</label>
                             <input type="color" class="form-control form-control-color" id="state-color" value="#6c757d">
                         </div>
@@ -587,7 +1650,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer.General["Cancel"]</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="piranha.workflowStates.cancelStateModal()">@Localizer.General["Cancel"]</button>
                 <button type="button" class="btn btn-primary" onclick="piranha.workflowStates.saveState()">@Localizer.General["Save"]</button>
             </div>
         </div>
@@ -600,23 +1663,41 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="transition-modal-title">Create Transition</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <form id="transitionForm">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="transition-from-state" class="form-label">From State *</label>
+                            <select class="form-control" id="transition-from-state" required>
+                                <option value="">Select source state...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="transition-to-state" class="form-label">To State *</label>
+                            <select class="form-control" id="transition-to-state" required>
+                                <option value="">Select target state...</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="mb-3">
-                        <label for="transition-roles" class="form-label">Allowed Roles</label>
-                        <input type="text" class="form-control" id="transition-roles" placeholder="Admin, Editor, SysAdmin">
-                        <div class="form-text">Comma-separated list of roles that can perform this transition</div>
+                        <label for="transition-description" class="form-label">@Localizer.General["Description"]</label>
+                        <textarea class="form-control" id="transition-description" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Allowed Roles *</label>
+                        <div id="transition-roles-checkboxes" class="border rounded p-2" style="min-height: 80px;">
+                            <div class="text-muted">Loading roles...</div>
+                        </div>
+                        <div class="form-text">Select roles that can perform this transition</div>
                     </div>
                     <div class="mb-3">
                         <label for="transition-comment-template" class="form-label">Comment Template</label>
                         <input type="text" class="form-control" id="transition-comment-template" placeholder="Optional comment template" maxlength="200">
                         <div class="form-text">Template text for comments when performing this transition</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="transition-sort-order" class="form-label">Sort Order</label>
-                        <input type="number" class="form-control" id="transition-sort-order" value="1" min="1">
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
@@ -637,7 +1718,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer.General["Cancel"]</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="piranha.workflowStates.cancelTransitionModal()">@Localizer.General["Cancel"]</button>
                 <button type="button" class="btn btn-primary" onclick="piranha.workflowStates.saveTransition()">@Localizer.General["Save"]</button>
             </div>
         </div>
