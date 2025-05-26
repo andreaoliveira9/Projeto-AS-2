@@ -9,6 +9,7 @@
  */
 
 using Microsoft.Extensions.DependencyInjection;
+using Piranha;
 using Piranha.EditorialWorkflow.Repositories;
 using Piranha.Repositories.EditorialWorkflow;
 
@@ -33,5 +34,17 @@ public static class PiranhaServiceCollectionExtensions
         services.AddScoped<IWorkflowContentExtensionRepository, WorkflowContentExtensionRepository>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Uses the Editorial Workflow EF repositories.
+    /// </summary>
+    /// <param name="serviceBuilder">The service builder</param>
+    /// <returns>The updated builder</returns>
+    public static PiranhaServiceBuilder UseEditorialWorkflowEF(this PiranhaServiceBuilder serviceBuilder)
+    {
+        serviceBuilder.Services.AddEditorialWorkflowRepositories();
+        
+        return serviceBuilder;
     }
 }

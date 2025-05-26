@@ -89,6 +89,14 @@ public static class Menu
                     Route = "~/manager/modules",
                     Policy = Permission.Modules,
                     Css = "fas fa-code-branch"
+                },
+                new MenuItem
+                {
+                    InternalId = "WorkflowList",
+                    Name = "Editorial Workflows",
+                    Route = "~/manager/workflows",
+                    Policy = Permission.Admin,
+                    Css = "fas fa-project-diagram"
                 }
             }
         }

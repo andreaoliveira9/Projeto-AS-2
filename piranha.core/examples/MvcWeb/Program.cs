@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using MvcWeb.Data;
 using Piranha;
 using Piranha.AspNetCore.Identity.SQLite;
 using Piranha.AttributeBuilder;
-using Piranha.Data.EF.SQLite;
+using Piranha.Data.EF.EditorialWorkflow;
+using Piranha.EditorialWorkflow.Extensions;
 using Piranha.Manager.Editor;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +21,12 @@ builder.AddPiranha(options =>
 
     options.UseCms();
     options.UseManager();
+    
+    // Editorial Workflow
+    options.UseEditorialWorkflow();
+    
+    // Register EF repositories
+    builder.Services.AddEditorialWorkflowRepositories();
 
     options.UseFileStorage(naming: Piranha.Local.FileStorageNaming.UniqueFolderNames);
     options.UseImageSharp();
@@ -26,7 +34,7 @@ builder.AddPiranha(options =>
     options.UseMemoryCache();
 
     var connectionString = builder.Configuration.GetConnectionString("piranha");
-    options.UseEF<SQLiteDb>(db => db.UseSqlite(connectionString));
+    options.UseEF<SQLiteWorkflowDb>(db => db.UseSqlite(connectionString));
     options.UseIdentityWithSeed<IdentitySQLiteDb>(db => db.UseSqlite(connectionString));
 
     /**
