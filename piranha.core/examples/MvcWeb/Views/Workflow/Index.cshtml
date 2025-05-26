@@ -1,0 +1,90 @@
+@model MvcWeb.Models.WorkflowManagementViewModel
+@{
+    ViewData["Title"] = "Workflow Management";
+    Layout = "~/Areas/Manager/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Manager</li>
+                <li class="breadcrumb-item active" aria-current="page">Workflows</li>
+            </ol>
+        </nav>
+
+        <div class="top-nav">
+            <a href="@Url.Action("Create")" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                Create New Workflow
+            </a>
+        </div>
+    </div>
+
+    <div class="container-fluid app" id="workflow-list">
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+        {
+            <div class="alert alert-success" role="alert">
+                @Model.SuccessMessage
+            </div>
+        }
+
+        @if (!Model.Workflows.Any())
+        {
+            <div class="alert alert-info" role="alert">
+                No workflows found. Click the "Create New Workflow" button to create one.
+            </div>
+        }
+        else
+        {
+            <table class="table table-borderless">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Last Modified</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var workflow in Model.Workflows)
+                    {
+                        <tr>
+                            <td>@workflow.Name</td>
+                            <td>@workflow.Description</td>
+                            <td>
+                                @if (workflow.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td>@workflow.Created.ToString("yyyy-MM-dd")</td>
+                            <td>@workflow.LastModified.ToString("yyyy-MM-dd")</td>
+                            <td class="actions">
+                                <a href="#" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-pencil-alt"></i>
+                                </a>
+                                <a href="#" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div> 

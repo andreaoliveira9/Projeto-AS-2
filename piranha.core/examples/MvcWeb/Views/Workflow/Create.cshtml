@@ -1,0 +1,69 @@
+@model MvcWeb.Models.CreateWorkflowViewModel
+@{
+    ViewData["Title"] = "Create Workflow";
+    Layout = "~/Areas/Manager/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Manager</li>
+                <li class="breadcrumb-item"><a href="@Url.Action("Index")">Workflows</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Create</li>
+            </ol>
+        </nav>
+
+        <div class="top-nav">
+            <button form="workflowForm" class="btn btn-success">
+                <i class="fas fa-check"></i>
+                Save
+            </button>
+            <a href="@Url.Action("Index")" class="btn btn-secondary">
+                <i class="fas fa-times"></i>
+                Cancel
+            </a>
+        </div>
+    </div>
+
+    <div class="container-fluid app" id="workflow-create">
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        <form id="workflowForm" method="post">
+            <div class="card">
+                <div class="card-header">
+                    <span class="title">Workflow Definition</span>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="workflowJson" class="form-label">Workflow Definition (JSON)</label>
+                        <textarea id="workflowJson" name="WorkflowJson" class="form-control code" rows="20">@Model.WorkflowJson</textarea>
+                        <small class="form-text text-muted">Define your workflow structure in JSON format</small>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const textarea = document.getElementById('workflowJson');
+            textarea.addEventListener('keydown', function(e) {
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const start = this.selectionStart;
+                    const end = this.selectionEnd;
+                    this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+                    this.selectionStart = this.selectionEnd = start + 4;
+                }
+            });
+        });
+    </script>
+} 

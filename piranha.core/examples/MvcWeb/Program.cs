@@ -4,6 +4,10 @@ using Piranha.AspNetCore.Identity.SQLite;
 using Piranha.AttributeBuilder;
 using Piranha.Data.EF.SQLite;
 using Piranha.Manager.Editor;
+using Piranha.EditorialWorkflow.Repositories;
+using Piranha.Data.EF.EditorialWorkflow;
+using Piranha.Data.EditorialWorkflow;
+using MvcWeb.Areas.Manager.Workflow;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +50,13 @@ builder.AddPiranha(options =>
     options.LoginUrl = "login";
      */
 });
+
+// Register Editorial Workflow repositories
+builder.Services.AddScoped<IDb>(sp => sp.GetRequiredService<SQLiteDb>());
+builder.Services.AddEditorialWorkflowRepositories();
+
+// Register the workflow module
+builder.Services.AddPiranhaModule<WorkflowModule>();
 
 var app = builder.Build();
 
