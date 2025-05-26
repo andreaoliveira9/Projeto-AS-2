@@ -27,4 +27,7 @@ public interface IEditorialWorkflowService
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByUserAsync();
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByStateAsync(string state);
     Task<WorkflowInstance> GetWorkflowInstanceByIdAsync(Guid id);
+
+    // Debug methods
+    Task<bool> TestDatabaseConnectionAsync();
 } 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Piranha.AspNetCore.Identity.Data;
 using Piranha.EditorialWorkflow.Models;
 using Piranha.EditorialWorkflow.Repositories;
@@ -15,6 +16,7 @@ public class EditorialWorkflowService : IEditorialWorkflowService
     private readonly IWorkflowContentExtensionRepository _contentExtensionRepository;
     private readonly UserManager<User> _userManager;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<EditorialWorkflowService> _logger;
 
     public EditorialWorkflowService(
         IWorkflowDefinitionRepository workflowDefinitionRepository,
@@ -23,7 +25,8 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         ITransitionRuleRepository transitionRuleRepository,
         IWorkflowContentExtensionRepository contentExtensionRepository,
         UserManager<User> userManager,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ILogger<EditorialWorkflowService> logger)
     {
         _workflowDefinitionRepository = workflowDefinitionRepository;
         _workflowStateRepository = workflowStateRepository;
@@ -32,12 +35,75 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         _contentExtensionRepository = contentExtensionRepository;
         _userManager = userManager;
         _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
     }
 
     public async Task<WorkflowDefinition> CreateWorkflowDefinitionAsync(WorkflowDefinition definition)
     {
-        await _workflowDefinitionRepository.Save(definition);
-        return definition;
+        _logger.LogInformation("CreateWorkflowDefinitionAsync: Starting creation of workflow definition. Name: {Name}, IsActive: {IsActive}", 
+            definition?.Name, definition?.IsActive);
+
+        try
+        {
+            if (definition == null)
+            {
+                _logger.LogError("CreateWorkflowDefinitionAsync: Definition is null");
+                throw new ArgumentNullException(nameof(definition));
+            }
+
+            // Get current user information
+            var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
+            string userId = "system"; // fallback value
+            
+            if (user != null)
+            {
+                userId = user.Id.ToString();
+                _logger.LogDebug("CreateWorkflowDefinitionAsync: Current user ID: {UserId}", userId);
+            }
+            else
+            {
+                _logger.LogWarning("CreateWorkflowDefinitionAsync: Could not get current user from context, using fallback 'system'");
+            }
+
+            // Ensure ID is set
+            if (definition.Id == Guid.Empty)
+            {
+                definition.Id = Guid.NewGuid();
+                _logger.LogDebug("CreateWorkflowDefinitionAsync: Generated new ID: {Id}", definition.Id);
+            }
+
+            // Set audit fields
+            definition.CreatedBy = userId;
+            definition.LastModifiedBy = userId;
+            definition.Created = DateTime.UtcNow;
+            definition.LastModified = DateTime.UtcNow;
+
+            _logger.LogDebug("CreateWorkflowDefinitionAsync: Before repository save - ID: {Id}, Name: {Name}, CreatedBy: {CreatedBy}", 
+                definition.Id, definition.Name, definition.CreatedBy);
+
+            await _workflowDefinitionRepository.Save(definition);
+            
+            _logger.LogInformation("CreateWorkflowDefinitionAsync: Successfully saved workflow definition. ID: {Id}, Name: {Name}", 
+                definition.Id, definition.Name);
+
+            // Verify the save by attempting to retrieve the workflow
+            var savedDefinition = await _workflowDefinitionRepository.GetById(definition.Id);
+            if (savedDefinition != null)
+            {
+                _logger.LogInformation("CreateWorkflowDefinitionAsync: Verification successful - workflow found after save. ID: {Id}", definition.Id);
+            }
+            else
+            {
+                _logger.LogWarning("CreateWorkflowDefinitionAsync: Verification failed - workflow not found after save. ID: {Id}", definition.Id);
+            }
+
+            return definition;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CreateWorkflowDefinitionAsync: Error creating workflow definition. Name: {Name}", definition?.Name);
+            throw;
+        }
     }
 
     public async Task<WorkflowDefinition> UpdateWorkflowDefinitionAsync(WorkflowDefinition definition)
@@ -152,7 +218,35 @@ public class EditorialWorkflowService : IEditorialWorkflowService
 
     public async Task<IEnumerable<WorkflowDefinition>> GetAllWorkflowDefinitionsAsync()
     {
-        return await _workflowDefinitionRepository.GetAll();
+        _logger.LogInformation("GetAllWorkflowDefinitionsAsync: Starting retrieval of all workflow definitions");
+
+        try
+        {
+            var definitions = await _workflowDefinitionRepository.GetAll();
+            var definitionsList = definitions?.ToList() ?? new List<WorkflowDefinition>();
+            
+            _logger.LogInformation("GetAllWorkflowDefinitionsAsync: Retrieved {Count} workflow definitions", definitionsList.Count);
+            
+            if (definitionsList.Any())
+            {
+                foreach (var def in definitionsList)
+                {
+                    _logger.LogDebug("GetAllWorkflowDefinitionsAsync: Found workflow - ID: {Id}, Name: {Name}, IsActive: {IsActive}, Created: {Created}", 
+                        def.Id, def.Name, def.IsActive, def.Created);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("GetAllWorkflowDefinitionsAsync: No workflow definitions found in database");
+            }
+
+            return definitionsList;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetAllWorkflowDefinitionsAsync: Error retrieving workflow definitions");
+            throw;
+        }
     }
 
     public async Task<WorkflowDefinition> GetWorkflowDefinitionByIdAsync(Guid id)
@@ -162,19 +256,93 @@ public class EditorialWorkflowService : IEditorialWorkflowService
 
     public async Task<IEnumerable<WorkflowState>> GetWorkflowStatesByDefinitionAsync(Guid definitionId)
     {
-        return await _workflowStateRepository.GetByWorkflow(definitionId);
+        _logger.LogInformation("GetWorkflowStatesByDefinitionAsync: Starting retrieval of workflow states for definition ID: {DefinitionId}", definitionId);
+
+        try
+        {
+            var states = await _workflowStateRepository.GetByWorkflow(definitionId);
+            var statesList = states?.ToList() ?? new List<WorkflowState>();
+            
+            _logger.LogInformation("GetWorkflowStatesByDefinitionAsync: Retrieved {Count} workflow states for definition {DefinitionId}", 
+                statesList.Count, definitionId);
+            
+            if (statesList.Any())
+            {
+                foreach (var state in statesList)
+                {
+                    _logger.LogDebug("GetWorkflowStatesByDefinitionAsync: Found state - ID: {Id}, StateId: {StateId}, Name: {Name}, WorkflowDefinitionId: {WorkflowDefinitionId}", 
+                        state.Id, state.StateId, state.Name, state.WorkflowDefinitionId);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("GetWorkflowStatesByDefinitionAsync: No workflow states found for definition {DefinitionId}", definitionId);
+            }
+
+            return statesList;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetWorkflowStatesByDefinitionAsync: Error retrieving workflow states for definition {DefinitionId}", definitionId);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<TransitionRule>> GetTransitionRulesByDefinitionAsync(Guid definitionId)
     {
-        // Buscar todos os estados do workflow
-        var states = await _workflowStateRepository.GetByWorkflow(definitionId);
-        var rules = new List<TransitionRule>();
-        foreach (var state in states)
+        _logger.LogInformation("GetTransitionRulesByDefinitionAsync: Starting retrieval of transition rules for definition ID: {DefinitionId}", definitionId);
+
+        try
         {
-            var transitions = await _transitionRuleRepository.GetByFromState(state.Id);
-            rules.AddRange(transitions);
+            // Buscar todos os estados do workflow
+            var states = await _workflowStateRepository.GetByWorkflow(definitionId);
+            var statesList = states?.ToList() ?? new List<WorkflowState>();
+            
+            _logger.LogDebug("GetTransitionRulesByDefinitionAsync: Found {Count} states for definition {DefinitionId}", 
+                statesList.Count, definitionId);
+            
+            var rules = new List<TransitionRule>();
+            foreach (var state in statesList)
+            {
+                _logger.LogDebug("GetTransitionRulesByDefinitionAsync: Getting transitions for state {StateId} (ID: {Id})", 
+                    state.StateId, state.Id);
+                
+                var transitions = await _transitionRuleRepository.GetByFromState(state.Id);
+                var transitionsList = transitions?.ToList() ?? new List<TransitionRule>();
+                
+                _logger.LogDebug("GetTransitionRulesByDefinitionAsync: Found {Count} transitions for state {StateId}", 
+                    transitionsList.Count, state.StateId);
+                
+                rules.AddRange(transitionsList);
+            }
+            
+            _logger.LogInformation("GetTransitionRulesByDefinitionAsync: Retrieved {Count} total transition rules for definition {DefinitionId}", 
+                rules.Count, definitionId);
+
+            return rules;
         }
-        return rules;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetTransitionRulesByDefinitionAsync: Error retrieving transition rules for definition {DefinitionId}", definitionId);
+            throw;
+        }
+    }
+
+    public async Task<bool> TestDatabaseConnectionAsync()
+    {
+        _logger.LogInformation("TestDatabaseConnectionAsync: Starting database connection test");
+
+        try
+        {
+            // Try to get count of workflow definitions (simple database operation)
+            var count = await _workflowDefinitionRepository.CountAsync();
+            _logger.LogInformation("TestDatabaseConnectionAsync: Successfully retrieved count: {Count}", count);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "TestDatabaseConnectionAsync: Database connection test failed");
+            return false;
+        }
     }
 } 

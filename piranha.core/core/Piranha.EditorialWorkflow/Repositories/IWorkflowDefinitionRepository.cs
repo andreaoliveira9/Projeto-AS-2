@@ -83,4 +83,10 @@ public interface IWorkflowDefinitionRepository
     /// <param name="excludeId">Optional id to exclude from the check</param>
     /// <returns>True if a workflow with the name exists</returns>
     Task<bool> ExistsByName(string name, Guid? excludeId = null);
+
+    /// <summary>
+    /// Gets the count of workflow definitions.
+    /// </summary>
+    /// <returns>The count of workflow definitions</returns>
+    Task<int> CountAsync();
 }

@@ -12,110 +12,186 @@
     <script>
         piranha.workflowStates = {};
         piranha.workflowStates.workflowId = '@RouteData.Values["id"]';
+        piranha.workflowStates.loading = true;
 
         piranha.workflowStates.load = function () {
+            piranha.workflowStates.loading = true;
+            piranha.workflowStates.updateLoadingState();
+            
+            console.log('Loading workflow states for ID:', piranha.workflowStates.workflowId);
+            
             // Load workflow definition
-            fetch(piranha.baseUrl + 'api/workflow/definitions/' + piranha.workflowStates.workflowId)
-                .then(function (response) { return response.json(); })
+            fetch(piranha.baseUrl + 'api/workflow/definitions/' + piranha.workflowStates.workflowId, {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Failed to load workflow: ' + response.status);
+                    }
+                    return response.json(); 
+                })
                 .then(function (workflow) {
-                    document.getElementById('workflow-name').textContent = workflow.name;
+                    console.log('Workflow loaded:', workflow);
+                    document.getElementById('workflow-name').textContent = workflow.name || 'Unknown Workflow';
                     document.getElementById('workflow-description').textContent = workflow.description || '';
                 })
                 .catch(function (error) {
                     console.error('Error loading workflow:', error);
+                    piranha.notifications.push({
+                        type: 'error',
+                        title: 'Error',
+                        body: 'Failed to load workflow: ' + error.message
+                    });
                 });
 
             // Load states
-            fetch(piranha.baseUrl + 'api/workflow/definitions/' + piranha.workflowStates.workflowId + '/states')
-                .then(function (response) { return response.json(); })
+            fetch(piranha.baseUrl + 'api/workflow/definitions/' + piranha.workflowStates.workflowId + '/states', {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Failed to load states: ' + response.status);
+                    }
+                    return response.json(); 
+                })
                 .then(function (states) {
+                    console.log('States loaded:', states);
                     piranha.workflowStates.updateStatesList(states);
                 })
                 .catch(function (error) {
                     console.error('Error loading states:', error);
+                    document.getElementById('states-list').innerHTML = '<div class="alert alert-danger">Error loading states: ' + error.message + '</div>';
                 });
 
             // Load transition rules
-            fetch(piranha.baseUrl + 'api/workflow/definitions/' + piranha.workflowStates.workflowId + '/rules')
-                .then(function (response) { return response.json(); })
+            fetch(piranha.baseUrl + 'api/workflow/definitions/' + piranha.workflowStates.workflowId + '/rules', {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Failed to load rules: ' + response.status);
+                    }
+                    return response.json(); 
+                })
                 .then(function (rules) {
+                    console.log('Rules loaded:', rules);
                     piranha.workflowStates.updateTransitionsList(rules);
                 })
                 .catch(function (error) {
                     console.error('Error loading transitions:', error);
+                    document.getElementById('transitions-list').innerHTML = '<div class="alert alert-danger">Error loading transitions: ' + error.message + '</div>';
+                })
+                .finally(function() {
+                    piranha.workflowStates.loading = false;
+                    piranha.workflowStates.updateLoadingState();
                 });
         };
 
-        piranha.workflowStates.updateStatesList = function (states) {
-            var html = '';
-            states.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
-            
-            for (var i = 0; i < states.length; i++) {
-                var state = states[i];
-                var badges = '';
-                
-                if (state.isInitial) badges += '<span class="badge bg-success me-1">Initial</span>';
-                if (state.isPublished) badges += '<span class="badge bg-primary me-1">Published</span>';
-                if (state.isFinal) badges += '<span class="badge bg-dark me-1">Final</span>';
-                
-                html += '<div class="card mb-2">';
-                html += '<div class="card-body">';
-                html += '<div class="row align-items-center">';
-                html += '<div class="col">';
-                html += '<h6 class="card-title mb-1">' + state.name + ' <small class="text-muted">(' + state.stateId + ')</small></h6>';
-                html += '<p class="card-text text-muted mb-1">' + (state.description || '') + '</p>';
-                html += badges;
-                html += '</div>';
-                html += '<div class="col-auto">';
-                html += '<div class="btn-group" role="group">';
-                html += '<button type="button" class="btn btn-outline-primary btn-sm" onclick="piranha.workflowStates.editState(\'' + state.id + '\')">Edit</button>';
-                html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="piranha.workflowStates.deleteState(\'' + state.id + '\')">Delete</button>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
+        piranha.workflowStates.updateLoadingState = function() {
+            var appContainer = document.getElementById('workflow-states-app');
+            if (appContainer) {
+                if (piranha.workflowStates.loading) {
+                    appContainer.classList.remove('ready');
+                } else {
+                    appContainer.classList.add('ready');
+                }
             }
+        };
 
-            if (states.length === 0) {
-                html = '<div class="empty"><div class="empty-icon"><i class="fas fa-circle"></i></div><p class="empty-title h6">No states</p><p class="empty-subtitle text-muted">Create states to define your workflow.</p></div>';
+        piranha.workflowStates.updateStatesList = function (states) {
+            console.log('Updating states list with:', states);
+            
+            var html = '';
+            
+            if (states && states.length > 0) {
+                states.sort(function(a, b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
+                
+                for (var i = 0; i < states.length; i++) {
+                    var state = states[i];
+                    var badges = '';
+                    
+                    if (state.isInitial) badges += '<span class="badge bg-success me-1">Initial</span>';
+                    if (state.isPublished) badges += '<span class="badge bg-primary me-1">Published</span>';
+                    if (state.isFinal) badges += '<span class="badge bg-dark me-1">Final</span>';
+                    
+                    html += '<div class="card mb-2">';
+                    html += '<div class="card-body">';
+                    html += '<div class="row align-items-center">';
+                    html += '<div class="col">';
+                    html += '<h6 class="card-title mb-1">' + (state.name || 'Unnamed State') + ' <small class="text-muted">(' + (state.stateId || 'no-id') + ')</small></h6>';
+                    html += '<p class="card-text text-muted mb-1">' + (state.description || 'No description') + '</p>';
+                    html += badges;
+                    html += '</div>';
+                    html += '<div class="col-auto">';
+                    html += '<div class="btn-group" role="group">';
+                    html += '<button type="button" class="btn btn-outline-primary btn-sm" onclick="piranha.workflowStates.editState(\'' + (state.id || '') + '\')"><i class="fas fa-edit me-1"></i>Edit</button>';
+                    html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="piranha.workflowStates.deleteState(\'' + (state.id || '') + '\')"><i class="fas fa-trash me-1"></i>Delete</button>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                }
+            } else {
+                html = '<div class="empty text-center py-4">';
+                html += '<div class="empty-icon mb-3"><i class="fas fa-circle fa-3x text-muted"></i></div>';
+                html += '<h6 class="empty-title">No States</h6>';
+                html += '<p class="empty-subtitle text-muted">Create states to define your workflow.</p>';
+                html += '<button type="button" class="btn btn-primary" onclick="piranha.workflowStates.createState()"><i class="fas fa-plus me-1"></i>Create Your First State</button>';
+                html += '</div>';
             }
 
             document.getElementById('states-list').innerHTML = html;
         };
 
         piranha.workflowStates.updateTransitionsList = function (rules) {
+            console.log('Updating transitions list with:', rules);
+            
             var html = '';
             
-            for (var i = 0; i < rules.length; i++) {
-                var rule = rules[i];
-                var roles = JSON.parse(rule.allowedRoles || '[]');
-                var rolesText = roles.length > 0 ? roles.join(', ') : 'No roles specified';
-                
-                html += '<div class="card mb-2">';
-                html += '<div class="card-body">';
-                html += '<div class="row align-items-center">';
-                html += '<div class="col">';
-                html += '<h6 class="card-title mb-1">Transition Rule</h6>';
-                html += '<p class="card-text text-muted mb-1">Allowed Roles: ' + rolesText + '</p>';
-                if (rule.commentTemplate) {
-                    html += '<p class="card-text text-muted mb-1">Comment Template: ' + rule.commentTemplate + '</p>';
+            if (rules && rules.length > 0) {
+                for (var i = 0; i < rules.length; i++) {
+                    var rule = rules[i];
+                    var roles = [];
+                    try {
+                        roles = JSON.parse(rule.allowedRoles || '[]');
+                    } catch (e) {
+                        roles = [];
+                    }
+                    
+                    var rolesText = roles.length > 0 ? roles.join(', ') : 'No roles specified';
+                    
+                    html += '<div class="card mb-2">';
+                    html += '<div class="card-body">';
+                    html += '<div class="row align-items-center">';
+                    html += '<div class="col">';
+                    html += '<h6 class="card-title mb-1">Transition Rule</h6>';
+                    html += '<p class="card-text text-muted mb-1">Allowed Roles: ' + rolesText + '</p>';
+                    if (rule.commentTemplate) {
+                        html += '<p class="card-text text-muted mb-1">Comment Template: ' + rule.commentTemplate + '</p>';
+                    }
+                    html += '<small class="text-muted">Requires Comment: ' + (rule.requiresComment ? 'Yes' : 'No') + '</small>';
+                    html += '</div>';
+                    html += '<div class="col-auto">';
+                    html += '<div class="btn-group" role="group">';
+                    html += '<button type="button" class="btn btn-outline-primary btn-sm" onclick="piranha.workflowStates.editTransition(\'' + (rule.id || '') + '\')"><i class="fas fa-edit me-1"></i>Edit</button>';
+                    html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="piranha.workflowStates.deleteTransition(\'' + (rule.id || '') + '\')"><i class="fas fa-trash me-1"></i>Delete</button>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
                 }
-                html += '<small class="text-muted">Requires Comment: ' + (rule.requiresComment ? 'Yes' : 'No') + '</small>';
+            } else {
+                html = '<div class="empty text-center py-4">';
+                html += '<div class="empty-icon mb-3"><i class="fas fa-arrow-right fa-3x text-muted"></i></div>';
+                html += '<h6 class="empty-title">No Transition Rules</h6>';
+                html += '<p class="empty-subtitle text-muted">Create transition rules to define how states connect.</p>';
+                html += '<button type="button" class="btn btn-primary" onclick="piranha.workflowStates.createTransition()"><i class="fas fa-plus me-1"></i>Create Your First Transition</button>';
                 html += '</div>';
-                html += '<div class="col-auto">';
-                html += '<div class="btn-group" role="group">';
-                html += '<button type="button" class="btn btn-outline-primary btn-sm" onclick="piranha.workflowStates.editTransition(\'' + rule.id + '\')">Edit</button>';
-                html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="piranha.workflowStates.deleteTransition(\'' + rule.id + '\')">Delete</button>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-            }
-
-            if (rules.length === 0) {
-                html = '<div class="empty"><div class="empty-icon"><i class="fas fa-arrow-right"></i></div><p class="empty-title h6">No transition rules</p><p class="empty-subtitle text-muted">Create transition rules to define how states connect.</p></div>';
             }
 
             document.getElementById('transitions-list').innerHTML = html;
@@ -126,13 +202,26 @@
         };
 
         piranha.workflowStates.editState = function (id) {
-            fetch(piranha.baseUrl + 'api/workflow/states/' + id)
-                .then(function (response) { return response.json(); })
+            fetch(piranha.baseUrl + 'api/workflow/states/' + id, {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Failed to load state');
+                    }
+                    return response.json(); 
+                })
                 .then(function (state) {
                     piranha.workflowStates.openStateModal(state);
                 })
                 .catch(function (error) {
                     console.error('Error loading state:', error);
+                    piranha.notifications.push({
+                        type: 'error',
+                        title: 'Error',
+                        body: 'Failed to load state: ' + error.message
+                    });
                 });
         };
 
@@ -145,7 +234,7 @@
                 isPublished: false, 
                 isFinal: false,
                 sortOrder: 1,
-                colorCode: ''
+                colorCode: '#6c757d'
             };
             
             document.getElementById('state-modal-title').textContent = state.id ? 'Edit State' : 'Create State';
@@ -156,11 +245,11 @@
             document.getElementById('state-published').checked = state.isPublished === true;
             document.getElementById('state-final').checked = state.isFinal === true;
             document.getElementById('state-sort-order').value = state.sortOrder || 1;
-            document.getElementById('state-color').value = state.colorCode || '';
+            document.getElementById('state-color').value = state.colorCode || '#6c757d';
             document.getElementById('state-modal').setAttribute('data-state-id', state.id || '');
             
-            var modal = new bootstrap.Modal(document.getElementById('state-modal'));
-            modal.show();
+            // Use jQuery to show modal (Piranha style)
+            $('#state-modal').modal('show');
         };
 
         piranha.workflowStates.saveState = function () {
@@ -168,9 +257,9 @@
             var isEdit = stateId && stateId !== '';
             
             var state = {
-                stateId: document.getElementById('state-id').value,
-                name: document.getElementById('state-name').value,
-                description: document.getElementById('state-description').value,
+                stateId: document.getElementById('state-id').value.trim(),
+                name: document.getElementById('state-name').value.trim(),
+                description: document.getElementById('state-description').value.trim(),
                 isInitial: document.getElementById('state-initial').checked,
                 isPublished: document.getElementById('state-published').checked,
                 isFinal: document.getElementById('state-final').checked,
@@ -178,6 +267,24 @@
                 colorCode: document.getElementById('state-color').value,
                 workflowDefinitionId: piranha.workflowStates.workflowId
             };
+            
+            if (!state.stateId) {
+                piranha.notifications.push({
+                    type: 'warning',
+                    title: 'Validation Error',
+                    body: 'Please enter a state ID.'
+                });
+                return;
+            }
+            
+            if (!state.name) {
+                piranha.notifications.push({
+                    type: 'warning',
+                    title: 'Validation Error',
+                    body: 'Please enter a state name.'
+                });
+                return;
+            }
             
             if (isEdit) {
                 state.id = stateId;
@@ -188,28 +295,65 @@
 
             fetch(url, {
                 method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                },
+                headers: piranha.utils.antiForgeryHeaders(),
                 body: JSON.stringify(state)
             })
             .then(function (response) {
                 if (response.ok) {
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('state-modal'));
-                    modal.hide();
+                    // Use jQuery to hide modal (Piranha style)
+                    $('#state-modal').modal('hide');
+                    
+                    // Show success notification
+                    piranha.notifications.push({
+                        type: 'success',
+                        title: 'Success',
+                        body: isEdit ? 'State updated successfully' : 'State created successfully'
+                    });
+                    
+                    // Reload the data
                     piranha.workflowStates.load();
                 } else {
-                    console.error('Error saving state');
+                    return response.json().then(function(errorData) {
+                        throw new Error(errorData.message || 'Failed to save state');
+                    });
                 }
             })
             .catch(function (error) {
                 console.error('Error saving state:', error);
+                piranha.notifications.push({
+                    type: 'error',
+                    title: 'Error',
+                    body: 'Failed to save state: ' + error.message
+                });
             });
         };
 
         piranha.workflowStates.createTransition = function () {
             piranha.workflowStates.openTransitionModal();
+        };
+
+        piranha.workflowStates.editTransition = function (id) {
+            fetch(piranha.baseUrl + 'api/workflow/rules/' + id, {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Failed to load transition');
+                    }
+                    return response.json(); 
+                })
+                .then(function (transition) {
+                    piranha.workflowStates.openTransitionModal(transition);
+                })
+                .catch(function (error) {
+                    console.error('Error loading transition:', error);
+                    piranha.notifications.push({
+                        type: 'error',
+                        title: 'Error',
+                        body: 'Failed to load transition: ' + error.message
+                    });
+                });
         };
 
         piranha.workflowStates.openTransitionModal = function (transition) {
@@ -237,20 +381,20 @@
             document.getElementById('transition-sort-order').value = transition.sortOrder || 1;
             document.getElementById('transition-modal').setAttribute('data-transition-id', transition.id || '');
             
-            var modal = new bootstrap.Modal(document.getElementById('transition-modal'));
-            modal.show();
+            // Use jQuery to show modal (Piranha style)
+            $('#transition-modal').modal('show');
         };
 
         piranha.workflowStates.saveTransition = function () {
             var transitionId = document.getElementById('transition-modal').getAttribute('data-transition-id');
             var isEdit = transitionId && transitionId !== '';
             
-            var rolesText = document.getElementById('transition-roles').value;
+            var rolesText = document.getElementById('transition-roles').value.trim();
             var roles = rolesText ? rolesText.split(',').map(function(r) { return r.trim(); }) : [];
             
             var transition = {
                 allowedRoles: JSON.stringify(roles),
-                commentTemplate: document.getElementById('transition-comment-template').value,
+                commentTemplate: document.getElementById('transition-comment-template').value.trim(),
                 requiresComment: document.getElementById('transition-requires-comment').checked,
                 isActive: document.getElementById('transition-active').checked,
                 sortOrder: parseInt(document.getElementById('transition-sort-order').value) || 1
@@ -265,89 +409,116 @@
 
             fetch(url, {
                 method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                },
+                headers: piranha.utils.antiForgeryHeaders(),
                 body: JSON.stringify(transition)
             })
             .then(function (response) {
                 if (response.ok) {
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('transition-modal'));
-                    modal.hide();
+                    // Use jQuery to hide modal (Piranha style)
+                    $('#transition-modal').modal('hide');
+                    
+                    // Show success notification
+                    piranha.notifications.push({
+                        type: 'success',
+                        title: 'Success',
+                        body: isEdit ? 'Transition updated successfully' : 'Transition created successfully'
+                    });
+                    
+                    // Reload the data
                     piranha.workflowStates.load();
                 } else {
-                    console.error('Error saving transition');
+                    return response.json().then(function(errorData) {
+                        throw new Error(errorData.message || 'Failed to save transition');
+                    });
                 }
             })
             .catch(function (error) {
                 console.error('Error saving transition:', error);
+                piranha.notifications.push({
+                    type: 'error',
+                    title: 'Error',
+                    body: 'Failed to save transition: ' + error.message
+                });
             });
         };
 
         // Load data on page ready
-        document.addEventListener('DOMContentLoaded', function() {
+        $(document).ready(function() {
+            console.log('WorkflowStates page loaded, loading data...');
             piranha.workflowStates.load();
+        });
+
+        // Focus on appropriate fields when modals are shown
+        $(document).on('shown.bs.modal', '#state-modal', function (event) {
+            $(this).find('#state-id').focus();
+        });
+
+        $(document).on('shown.bs.modal', '#transition-modal', function (event) {
+            $(this).find('#transition-roles').focus();
         });
     </script>
 }
 
-<div class="top">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item">@Localizer.Menu["System"]</li>
-            <li class="breadcrumb-item"><a href="~/manager/workflows">Editorial Workflows</a></li>
-            <li class="breadcrumb-item active" aria-current="page">States & Transitions</li>
-        </ol>
-    </nav>
-</div>
-
-<div class="container-fluid app">
-    <div class="row">
-        <div class="col-12">
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5 class="card-title" id="workflow-name">Loading...</h5>
-                    <p class="card-text text-muted" id="workflow-description"></p>
-                </div>
-            </div>
-        </div>
+<div id="workflow-states">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">@Localizer.Menu["System"]</li>
+                <li class="breadcrumb-item"><a href="~/manager/workflows">@Localizer.General["Editorial Workflows"]</a></li>
+                <li class="breadcrumb-item active" aria-current="page">States & Transitions</li>
+            </ol>
+        </nav>
     </div>
 
-    <div class="row">
-        <div class="col-lg-6">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Workflow States</h6>
-                    <button class="btn btn-primary btn-sm" onclick="piranha.workflowStates.createState()">
-                        <i class="fas fa-plus"></i> Add State
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div id="states-list">
-                        <div class="text-center">
-                            <div class="spinner-border text-secondary" role="status">
-                                <span class="sr-only">Loading...</span>
-                            </div>
-                        </div>
+    <div class="container-fluid app" id="workflow-states-app">
+        <div class="row">
+            <div class="col-12">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title" id="workflow-name">Loading...</h5>
+                        <p class="card-text text-muted" id="workflow-description"></p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-6">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Transition Rules</h6>
-                    <button class="btn btn-primary btn-sm" onclick="piranha.workflowStates.createTransition()">
-                        <i class="fas fa-plus"></i> Add Transition
-                    </button>
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Workflow States</h6>
+                        <button class="btn btn-primary btn-sm" onclick="piranha.workflowStates.createState()">
+                            <i class="fas fa-plus"></i> @Localizer.General["Add"] State
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="states-list">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2 mb-0 text-muted">Loading states...</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div id="transitions-list">
-                        <div class="text-center">
-                            <div class="spinner-border text-secondary" role="status">
-                                <span class="sr-only">Loading...</span>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Transition Rules</h6>
+                        <button class="btn btn-primary btn-sm" onclick="piranha.workflowStates.createTransition()">
+                            <i class="fas fa-plus"></i> @Localizer.General["Add"] Transition
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="transitions-list">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2 mb-0 text-muted">Loading transitions...</p>
                             </div>
                         </div>
                     </div>
@@ -366,19 +537,19 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form>
+                <form id="stateForm">
                     <div class="mb-3">
                         <label for="state-id" class="form-label">State ID *</label>
-                        <input type="text" class="form-control" id="state-id" required placeholder="e.g., draft, review, published">
+                        <input type="text" class="form-control" id="state-id" required placeholder="e.g., draft, review, published" maxlength="50">
                         <div class="form-text">Unique identifier for the state (lowercase, no spaces)</div>
                     </div>
                     <div class="mb-3">
-                        <label for="state-name" class="form-label">Name *</label>
-                        <input type="text" class="form-control" id="state-name" required placeholder="e.g., Draft, Under Review, Published">
+                        <label for="state-name" class="form-label">@Localizer.General["Name"] *</label>
+                        <input type="text" class="form-control" id="state-name" required placeholder="e.g., Draft, Under Review, Published" maxlength="100">
                     </div>
                     <div class="mb-3">
-                        <label for="state-description" class="form-label">Description</label>
-                        <textarea class="form-control" id="state-description" rows="2"></textarea>
+                        <label for="state-description" class="form-label">@Localizer.General["Description"]</label>
+                        <textarea class="form-control" id="state-description" rows="2" maxlength="500"></textarea>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
@@ -416,8 +587,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="piranha.workflowStates.saveState()">Save</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer.General["Cancel"]</button>
+                <button type="button" class="btn btn-primary" onclick="piranha.workflowStates.saveState()">@Localizer.General["Save"]</button>
             </div>
         </div>
     </div>
@@ -432,7 +603,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form>
+                <form id="transitionForm">
                     <div class="mb-3">
                         <label for="transition-roles" class="form-label">Allowed Roles</label>
                         <input type="text" class="form-control" id="transition-roles" placeholder="Admin, Editor, SysAdmin">
@@ -440,7 +611,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="transition-comment-template" class="form-label">Comment Template</label>
-                        <input type="text" class="form-control" id="transition-comment-template" placeholder="Optional comment template">
+                        <input type="text" class="form-control" id="transition-comment-template" placeholder="Optional comment template" maxlength="200">
                         <div class="form-text">Template text for comments when performing this transition</div>
                     </div>
                     <div class="mb-3">
@@ -466,11 +637,35 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="piranha.workflowStates.saveTransition()">Save</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer.General["Cancel"]</button>
+                <button type="button" class="btn btn-primary" onclick="piranha.workflowStates.saveTransition()">@Localizer.General["Save"]</button>
             </div>
         </div>
     </div>
 </div>
 
 @Html.AntiForgeryToken()
+
+<style>
+    /* Ensure elements are visible by default */
+    .container-fluid.app {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .container-fluid.app.ready {
+        opacity: 1;
+    }
+    
+    /* Make sure buttons and other elements are visible */
+    .btn, .card, .modal {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    
+    /* Ensure the top navigation is always visible */
+    .top, .top-nav {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+</style>

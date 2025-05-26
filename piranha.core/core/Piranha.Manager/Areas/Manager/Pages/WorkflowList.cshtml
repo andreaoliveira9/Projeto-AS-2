@@ -3,7 +3,7 @@
 @inject ManagerLocalizer Localizer
 @using Piranha.Manager
 @{
-    ViewBag.Title = "Editorial Workflows";
+    ViewBag.Title = Localizer.General["Editorial Workflows"];
     ViewBag.MenuItem = "WorkflowList";
 }
 
@@ -11,46 +11,151 @@
 {
     <script>
         piranha.workflow = {};
+        piranha.workflow.loading = true;
 
         piranha.workflow.load = function () {
-            fetch(piranha.baseUrl + 'api/workflow/definitions')
-                .then(function (response) { return response.json(); })
-                .then(function (result) {
-                    piranha.workflow.updateList(result);
+            console.log('piranha.workflow.load: Starting workflow load operation');
+            
+            piranha.workflow.loading = true;
+            piranha.workflow.updateLoadingState();
+            
+            var url = piranha.baseUrl + 'api/workflow/definitions';
+            console.log('piranha.workflow.load: Making API call to:', url);
+            
+            fetch(url, {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    console.log('piranha.workflow.load: Response received - Status:', response.status, ', OK:', response.ok);
+                    console.log('piranha.workflow.load: Response content-type:', response.headers.get('content-type'));
+                    
+                    return response.text().then(function(responseText) {
+                        console.log('piranha.workflow.load: Raw response text length:', responseText.length);
+                        console.log('piranha.workflow.load: Raw response text (first 500 chars):', responseText.substring(0, 500));
+                        
+                        if (!response.ok) {
+                            console.error('piranha.workflow.load: HTTP error - Status:', response.status);
+                            
+                            if (responseText.toLowerCase().includes('<!doctype') || responseText.toLowerCase().includes('<html')) {
+                                console.error('piranha.workflow.load: Received HTML response instead of JSON');
+                                throw new Error('Server returned an error page (Status: ' + response.status + ')');
+                            } else {
+                                throw new Error('Network response was not ok: ' + response.status + ' - ' + responseText);
+                            }
+                        }
+                        
+                        // Try to parse as JSON
+                        var result;
+                        try {
+                            result = JSON.parse(responseText);
+                            console.log('piranha.workflow.load: Successfully parsed JSON response');
+                        } catch (parseError) {
+                            console.error('piranha.workflow.load: Failed to parse response as JSON:', parseError);
+                            console.log('piranha.workflow.load: Response was:', responseText);
+                            throw new Error('Server returned invalid JSON response');
+                        }
+                        
+                        console.log('piranha.workflow.load: Workflows loaded successfully');
+                        console.log('piranha.workflow.load: Parsed result:', JSON.stringify(result, null, 2));
+                        console.log('piranha.workflow.load: Result type:', typeof result);
+                        console.log('piranha.workflow.load: Is array:', Array.isArray(result));
+                        console.log('piranha.workflow.load: Length:', result ? result.length : 'N/A');
+                        
+                        piranha.workflow.loading = false;
+                        piranha.workflow.updateList(result);
+                        piranha.workflow.updateLoadingState();
+                    });
                 })
                 .catch(function (error) {
-                    console.error('Error loading workflows:', error);
+                    console.error('piranha.workflow.load: Error loading workflows:', error);
+                    console.error('piranha.workflow.load: Error stack:', error.stack);
+                    
+                    piranha.workflow.loading = false;
+                    piranha.workflow.showError('Failed to load workflows: ' + error.message);
+                    piranha.workflow.updateLoadingState();
                 });
         };
 
+        piranha.workflow.updateLoadingState = function() {
+            var appContainer = document.getElementById('workflow-app');
+            if (appContainer) {
+                if (piranha.workflow.loading) {
+                    appContainer.classList.remove('ready');
+                } else {
+                    appContainer.classList.add('ready');
+                }
+            }
+        };
+
         piranha.workflow.updateList = function (workflows) {
+            var container = document.getElementById('workflow-list');
+            if (!container) {
+                console.error('Workflow list container not found');
+                return;
+            }
+
             var html = '';
-            for (var i = 0; i < workflows.length; i++) {
-                var workflow = workflows[i];
-                html += '<div class="card">';
-                html += '<div class="card-body">';
+            
+            if (workflows && workflows.length > 0) {
                 html += '<div class="row">';
-                html += '<div class="col">';
-                html += '<h5 class="card-title">' + workflow.name + '</h5>';
-                html += '<p class="card-text text-muted">' + (workflow.description || '') + '</p>';
-                html += '<small class="text-muted">States: ' + (workflow.states ? workflow.states.length : 0) + '</small>';
+                for (var i = 0; i < workflows.length; i++) {
+                    var workflow = workflows[i];
+                    html += '<div class="col-12 col-lg-6 mb-3">';
+                    html += '<div class="card">';
+                    html += '<div class="card-body">';
+                    html += '<div class="row align-items-center">';
+                    html += '<div class="col">';
+                    html += '<h5 class="card-title mb-1">' + (workflow.name || 'Unnamed Workflow') + '</h5>';
+                    html += '<p class="card-text text-muted mb-2">' + (workflow.description || 'No description') + '</p>';
+                    html += '<small class="text-muted">';
+                    html += '<i class="fas fa-layer-group me-1"></i>States: ' + (workflow.states ? workflow.states.length : 0);
+                    if (workflow.isActive !== undefined) {
+                        html += ' | <i class="fas ' + (workflow.isActive ? 'fa-check-circle text-success' : 'fa-times-circle text-danger') + ' me-1"></i>' + (workflow.isActive ? 'Active' : 'Inactive');
+                    }
+                    html += '</small>';
+                    html += '</div>';
+                    html += '<div class="col-auto">';
+                    html += '<div class="btn-group" role="group">';
+                    html += '<button type="button" class="btn btn-primary btn-sm" onclick="piranha.workflow.edit(\'' + workflow.id + '\')"><i class="fas fa-edit me-1"></i>Edit</button>';
+                    html += '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="piranha.workflow.configure(\'' + workflow.id + '\')"><i class="fas fa-cog me-1"></i>States</button>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                }
                 html += '</div>';
-                html += '<div class="col-auto">';
-                html += '<div class="btn-group" role="group">';
-                html += '<button type="button" class="btn btn-primary btn-sm" onclick="piranha.workflow.edit(\'' + workflow.id + '\')">Edit</button>';
-                html += '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="piranha.workflow.configure(\'' + workflow.id + '\')">Configure States</button>';
-                html += '</div>';
-                html += '</div>';
+            } else {
+                html = '<div class="row justify-content-center">';
+                html += '<div class="col-12 col-lg-8">';
+                html += '<div class="empty text-center py-5">';
+                html += '<div class="empty-icon mb-3"><i class="fas fa-project-diagram fa-3x text-muted"></i></div>';
+                html += '<h5 class="empty-title">No Editorial Workflows</h5>';
+                html += '<p class="empty-subtitle text-muted">You haven\'t created any editorial workflows yet.</p>';
+                html += '<button type="button" class="btn btn-primary" onclick="piranha.workflow.create()"><i class="fas fa-plus me-1"></i>Create Your First Workflow</button>';
                 html += '</div>';
                 html += '</div>';
                 html += '</div>';
             }
 
-            if (workflows.length === 0) {
-                html = '<div class="empty"><div class="empty-icon"><i class="fas fa-project-diagram"></i></div><p class="empty-title h5">No workflows</p><p class="empty-subtitle text-muted">You haven\'t created any editorial workflows yet.</p></div>';
-            }
+            container.innerHTML = html;
+        };
 
-            document.getElementById('workflow-list').innerHTML = html;
+        piranha.workflow.showError = function(message) {
+            var container = document.getElementById('workflow-list');
+            if (!container) return;
+            
+            var html = '<div class="row justify-content-center">';
+            html += '<div class="col-12 col-lg-8">';
+            html += '<div class="alert alert-danger" role="alert">';
+            html += '<i class="fas fa-exclamation-triangle me-2"></i>' + message;
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+            
+            container.innerHTML = html;
         };
 
         piranha.workflow.create = function () {
@@ -58,13 +163,26 @@
         };
 
         piranha.workflow.edit = function (id) {
-            fetch(piranha.baseUrl + 'api/workflow/definitions/' + id)
-                .then(function (response) { return response.json(); })
+            fetch(piranha.baseUrl + 'api/workflow/definitions/' + id, {
+                method: 'GET',
+                headers: piranha.utils.antiForgeryHeaders()
+            })
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Failed to load workflow: ' + response.status);
+                    }
+                    return response.json(); 
+                })
                 .then(function (workflow) {
                     piranha.workflow.openModal(workflow);
                 })
                 .catch(function (error) {
                     console.error('Error loading workflow:', error);
+                    piranha.notifications.push({
+                        type: 'error',
+                        title: 'Error',
+                        body: 'Failed to load workflow: ' + error.message
+                    });
                 });
         };
 
@@ -77,46 +195,142 @@
             document.getElementById('workflow-active').checked = workflow.isActive !== false;
             document.getElementById('workflow-modal').setAttribute('data-workflow-id', workflow.id || '');
             
-            var modal = new bootstrap.Modal(document.getElementById('workflow-modal'));
-            modal.show();
+            // Use jQuery to show modal (Piranha style)
+            $('#workflow-modal').modal('show');
         };
 
         piranha.workflow.save = function () {
+            console.log('piranha.workflow.save: Starting save operation');
+            
             var workflowId = document.getElementById('workflow-modal').getAttribute('data-workflow-id');
             var isEdit = workflowId && workflowId !== '';
             
+            console.log('piranha.workflow.save: isEdit =', isEdit, ', workflowId =', workflowId);
+            
             var workflow = {
-                name: document.getElementById('workflow-name').value,
-                description: document.getElementById('workflow-description').value,
+                name: document.getElementById('workflow-name').value.trim(),
+                description: document.getElementById('workflow-description').value.trim(),
                 isActive: document.getElementById('workflow-active').checked
             };
             
+            console.log('piranha.workflow.save: Workflow data prepared:', JSON.stringify(workflow, null, 2));
+            
+            if (!workflow.name) {
+                console.warn('piranha.workflow.save: Validation failed - empty workflow name');
+                piranha.notifications.push({
+                    type: 'warning',
+                    title: 'Validation Error',
+                    body: 'Please enter a workflow name.'
+                });
+                return;
+            }
+            
             if (isEdit) {
                 workflow.id = workflowId;
+                console.log('piranha.workflow.save: Set workflow ID for edit:', workflow.id);
             }
 
             var url = piranha.baseUrl + 'api/workflow/definitions' + (isEdit ? '/' + workflowId : '');
             var method = isEdit ? 'PUT' : 'POST';
 
+            var headers = piranha.utils.antiForgeryHeaders();
+            headers['Content-Type'] = 'application/json';
+            
+            console.log('piranha.workflow.save: Making API call - URL:', url, ', Method:', method);
+            console.log('piranha.workflow.save: Request payload:', JSON.stringify(workflow, null, 2));
+            console.log('piranha.workflow.save: Headers:', headers);
+
             fetch(url, {
                 method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                },
+                headers: headers,
                 body: JSON.stringify(workflow)
             })
             .then(function (response) {
-                if (response.ok) {
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('workflow-modal'));
-                    modal.hide();
-                    piranha.workflow.load();
-                } else {
-                    console.error('Error saving workflow');
-                }
+                console.log('piranha.workflow.save: Response received - Status:', response.status, ', OK:', response.ok);
+                console.log('piranha.workflow.save: Response headers:', response.headers);
+                console.log('piranha.workflow.save: Response content-type:', response.headers.get('content-type'));
+                
+                // Get the response text first to see what we're actually receiving
+                return response.text().then(function(responseText) {
+                    console.log('piranha.workflow.save: Raw response text:', responseText);
+                    
+                    if (response.ok) {
+                        console.log('piranha.workflow.save: Save successful, processing response');
+                        
+                        // Try to parse as JSON
+                        var responseData;
+                        try {
+                            responseData = JSON.parse(responseText);
+                            console.log('piranha.workflow.save: Parsed response data:', JSON.stringify(responseData, null, 2));
+                        } catch (parseError) {
+                            console.error('piranha.workflow.save: Failed to parse response as JSON:', parseError);
+                            console.log('piranha.workflow.save: Response was:', responseText);
+                            throw new Error('Server returned invalid JSON response');
+                        }
+                        
+                        // Use jQuery to hide modal (Piranha style)
+                        $('#workflow-modal').modal('hide');
+                        
+                        // Clear form
+                        document.getElementById('workflow-name').value = '';
+                        document.getElementById('workflow-description').value = '';
+                        document.getElementById('workflow-active').checked = true;
+                        document.getElementById('workflow-modal').setAttribute('data-workflow-id', '');
+                        
+                        // Show success notification
+                        piranha.notifications.push({
+                            type: 'success',
+                            title: 'Success',
+                            body: isEdit ? 'Workflow updated successfully' : 'Workflow created successfully'
+                        });
+                        
+                        console.log('piranha.workflow.save: Success notification sent, reloading list');
+                        
+                        // Reload the list
+                        piranha.workflow.load();
+                        
+                    } else {
+                        console.error('piranha.workflow.save: Server error response - Status:', response.status);
+                        console.error('piranha.workflow.save: Server error response text:', responseText);
+                        
+                        // Check if it's HTML (error page)
+                        if (responseText.toLowerCase().includes('<!doctype') || responseText.toLowerCase().includes('<html')) {
+                            console.error('piranha.workflow.save: Received HTML response instead of JSON - likely an error page');
+                            
+                            // Try to extract error information from HTML
+                            var errorMessage = 'Server returned an error page instead of JSON response';
+                            if (response.status === 401) {
+                                errorMessage = 'Unauthorized - please log in again';
+                            } else if (response.status === 403) {
+                                errorMessage = 'Forbidden - insufficient permissions';
+                            } else if (response.status === 404) {
+                                errorMessage = 'API endpoint not found';
+                            } else if (response.status >= 500) {
+                                errorMessage = 'Internal server error';
+                            }
+                            
+                            throw new Error(errorMessage + ' (Status: ' + response.status + ')');
+                        } else {
+                            // Try to parse error as JSON
+                            try {
+                                var errorData = JSON.parse(responseText);
+                                throw new Error(errorData.message || errorData.error || 'Server error');
+                            } catch (parseError) {
+                                throw new Error('Server error: ' + response.status + ' - ' + responseText);
+                            }
+                        }
+                    }
+                });
             })
             .catch(function (error) {
-                console.error('Error saving workflow:', error);
+                console.error('piranha.workflow.save: Error occurred:', error);
+                console.error('piranha.workflow.save: Error stack:', error.stack);
+                
+                piranha.notifications.push({
+                    type: 'error',
+                    title: 'Error',
+                    body: 'Failed to save workflow: ' + error.message
+                });
             });
         };
 
@@ -124,38 +338,107 @@
             window.location.href = piranha.baseUrl + 'manager/workflow/' + id + '/states';
         };
 
+        piranha.workflow.testDatabase = function () {
+            console.log('piranha.workflow.testDatabase: Starting database test');
+            
+            var url = piranha.baseUrl + 'api/workflow/debug/database';
+            var headers = piranha.utils.antiForgeryHeaders();
+            console.log('piranha.workflow.testDatabase: URL:', url);
+            console.log('piranha.workflow.testDatabase: Headers:', headers);
+            
+            fetch(url, {
+                method: 'GET',
+                headers: headers
+            })
+            .then(function (response) {
+                console.log('piranha.workflow.testDatabase: Response received - Status:', response.status);
+                console.log('piranha.workflow.testDatabase: Response content-type:', response.headers.get('content-type'));
+                
+                return response.text().then(function(responseText) {
+                    console.log('piranha.workflow.testDatabase: Raw response:', responseText);
+                    
+                    if (!response.ok) {
+                        if (responseText.toLowerCase().includes('<!doctype') || responseText.toLowerCase().includes('<html')) {
+                            console.error('piranha.workflow.testDatabase: Received HTML response - likely authentication or routing issue');
+                            throw new Error('API endpoint not accessible (Status: ' + response.status + ')');
+                        } else {
+                            throw new Error('HTTP ' + response.status + ': ' + responseText);
+                        }
+                    }
+                    
+                    var result;
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('piranha.workflow.testDatabase: Failed to parse JSON:', parseError);
+                        throw new Error('Invalid JSON response');
+                    }
+                    
+                    console.log('piranha.workflow.testDatabase: Result:', JSON.stringify(result, null, 2));
+                    
+                    piranha.notifications.push({
+                        type: result.DatabaseConnected ? 'success' : 'error',
+                        title: 'Database Test',
+                        body: result.Message || 'Database test completed'
+                    });
+                });
+            })
+            .catch(function (error) {
+                console.error('piranha.workflow.testDatabase: Error:', error);
+                
+                piranha.notifications.push({
+                    type: 'error',
+                    title: 'Database Test Error',
+                    body: 'Failed to test database: ' + error.message
+                });
+            });
+        };
+
         // Load workflows on page ready
-        document.addEventListener('DOMContentLoaded', function() {
+        $(document).ready(function() {
+            console.log('Page loaded, loading workflows...');
             piranha.workflow.load();
+        });
+
+        // Focus on name field when modal is shown
+        $(document).on('shown.bs.modal', '#workflow-modal', function (event) {
+            $(this).find('#workflow-name').focus();
         });
     </script>
 }
 
-<div class="top">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item">@Localizer.Menu["System"]</li>
-            <li class="breadcrumb-item active" aria-current="page">Editorial Workflows</li>
-        </ol>
-    </nav>
+<div id="workflow">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">@Localizer.Menu["System"]</li>
+                <li class="breadcrumb-item active" aria-current="page">@Localizer.General["Editorial Workflows"]</li>
+            </ol>
+        </nav>
 
-    <div class="container-fluid app" id="workflow-list-app">
-        <div class="top-nav">
-            <button class="btn btn-primary btn-labeled" type="button" onclick="piranha.workflow.create()">
-                <i class="fas fa-plus"></i>Create Workflow
-            </button>
+        <div class="container-fluid">
+            <div class="top-nav">
+                <button class="btn btn-primary btn-labeled" type="button" onclick="piranha.workflow.create()">
+                    <i class="fas fa-plus"></i>@Localizer.General["Create"] Workflow
+                </button>
+                <button class="btn btn-secondary btn-labeled ms-2" type="button" onclick="piranha.workflow.testDatabase()">
+                    <i class="fas fa-database"></i>Test Database
+                </button>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="container-fluid app">
-    <div id="workflow-list">
-        <div class="row justify-content-center">
-            <div class="col-12 col-lg-8">
-                <div class="card load-indicator">
-                    <div class="card-body text-center">
-                        <div class="spinner-border text-secondary" role="status">
-                            <span class="sr-only">Loading...</span>
+    <div class="container-fluid app" id="workflow-app">
+        <div id="workflow-list">
+            <!-- Loading indicator -->
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-8">
+                    <div class="card">
+                        <div class="card-body text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 mb-0 text-muted">Loading workflows...</p>
                         </div>
                     </div>
                 </div>
@@ -173,14 +456,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form>
+                <form id="workflowForm">
                     <div class="mb-3">
-                        <label for="workflow-name" class="form-label">Name *</label>
-                        <input type="text" class="form-control" id="workflow-name" required>
+                        <label for="workflow-name" class="form-label">@Localizer.General["Name"] *</label>
+                        <input type="text" class="form-control" id="workflow-name" required maxlength="100">
                     </div>
                     <div class="mb-3">
-                        <label for="workflow-description" class="form-label">Description</label>
-                        <textarea class="form-control" id="workflow-description" rows="3"></textarea>
+                        <label for="workflow-description" class="form-label">@Localizer.General["Description"]</label>
+                        <textarea class="form-control" id="workflow-description" rows="3" maxlength="500"></textarea>
                     </div>
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="workflow-active" checked>
@@ -191,11 +474,33 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="piranha.workflow.save()">Save</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer.General["Cancel"]</button>
+                <button type="button" class="btn btn-primary" onclick="piranha.workflow.save()">@Localizer.General["Save"]</button>
             </div>
         </div>
     </div>
 </div>
 
-@Html.AntiForgeryToken()
+<style>
+    /* Ensure elements are visible by default */
+    .container-fluid.app {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .container-fluid.app.ready {
+        opacity: 1;
+    }
+    
+    /* Make sure buttons and other elements are visible */
+    .btn, .card, .modal {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    
+    /* Ensure the top navigation is always visible */
+    .top, .top-nav {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+</style>
