@@ -34,7 +34,12 @@ builder.AddPiranha(options =>
     options.UseMemoryCache();
 
     var connectionString = builder.Configuration.GetConnectionString("piranha");
-    options.UseEF<SQLiteWorkflowDb>(db => db.UseSqlite(connectionString));
+    options.UseEF<SQLiteWorkflowDb>(db => {
+        db.UseSqlite(connectionString);
+        // Suppress the pending model changes warning
+        db.ConfigureWarnings(warnings =>
+            warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    });
     options.UseIdentityWithSeed<IdentitySQLiteDb>(db => db.UseSqlite(connectionString));
 
     /**
