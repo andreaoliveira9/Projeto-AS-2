@@ -20,6 +20,7 @@ namespace Piranha.Audit.Services;
 
 /// <summary>
 /// Background service that consumes audit events from a message queue.
+/// Focused solely on consuming messages and storing audit records.
 /// </summary>
 public sealed class AuditMessageConsumerService : BackgroundService
 {

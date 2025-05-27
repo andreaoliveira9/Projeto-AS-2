@@ -15,6 +15,7 @@ namespace Piranha.Repositories.Audit
 {
     /// <summary>
     /// Entity Framework implementation of the state change record repository.
+    /// Focused on saving audit records and retrieving by content.
     /// </summary>
     public sealed class StateChangeRecordRepository : IStateChangeRecordRepository
     {
@@ -26,68 +27,11 @@ namespace Piranha.Repositories.Audit
         }
 
         /// <inheritdoc />
-        public async Task<Piranha.Audit.Models.StateChangeRecord> GetByIdAsync(Guid id)
-        {
-            var entity = await _db.Set<Piranha.Data.Audit.StateChangeRecord>().FirstOrDefaultAsync(x => x.Id == id);
-            return entity != null ? Transform(entity) : null;
-        }
-
-        /// <inheritdoc />
-        public async Task<IEnumerable<Piranha.Audit.Models.StateChangeRecord>> GetByWorkflowInstanceAsync(Guid workflowInstanceId)
-        {
-            var entities = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
-                .Where(x => x.WorkflowInstanceId == workflowInstanceId)
-                .OrderBy(x => x.Timestamp)
-                .ToListAsync();
-
-            return entities.Select(Transform);
-        }
-
-        /// <inheritdoc />
         public async Task<IEnumerable<Piranha.Audit.Models.StateChangeRecord>> GetByContentAsync(Guid contentId)
         {
             var entities = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
                 .Where(x => x.ContentId == contentId)
                 .OrderBy(x => x.Timestamp)
-                .ToListAsync();
-
-            return entities.Select(Transform);
-        }
-
-        /// <inheritdoc />
-        public async Task<IEnumerable<Piranha.Audit.Models.StateChangeRecord>> GetByUserAsync(string userId, int take = 50, int skip = 0)
-        {
-            var entities = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
-                .Where(x => x.UserId == userId)
-                .OrderByDescending(x => x.Timestamp)
-                .Skip(skip)
-                .Take(take)
-                .ToListAsync();
-
-            return entities.Select(Transform);
-        }
-
-        /// <inheritdoc />
-        public async Task<IEnumerable<Piranha.Audit.Models.StateChangeRecord>> GetByDateRangeAsync(DateTime from, DateTime to, int take = 50, int skip = 0)
-        {
-            var entities = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
-                .Where(x => x.Timestamp >= from && x.Timestamp <= to)
-                .OrderByDescending(x => x.Timestamp)
-                .Skip(skip)
-                .Take(take)
-                .ToListAsync();
-
-            return entities.Select(Transform);
-        }
-
-        /// <inheritdoc />
-        public async Task<IEnumerable<Piranha.Audit.Models.StateChangeRecord>> GetByTransitionAsync(string fromState, string toState, int take = 50, int skip = 0)
-        {
-            var entities = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
-                .Where(x => x.FromState == fromState && x.ToState == toState)
-                .OrderByDescending(x => x.Timestamp)
-                .Skip(skip)
-                .Take(take)
                 .ToListAsync();
 
             return entities.Select(Transform);
@@ -126,41 +70,6 @@ namespace Piranha.Repositories.Audit
             {
                 await dbContext.SaveChangesAsync();
             }
-        }
-
-        /// <inheritdoc />
-        public async Task DeleteAsync(Guid id)
-        {
-            var entity = await _db.Set<Piranha.Data.Audit.StateChangeRecord>().FirstOrDefaultAsync(x => x.Id == id);
-            if (entity != null)
-            {
-                _db.Set<Piranha.Data.Audit.StateChangeRecord>().Remove(entity);
-                
-                if (_db is DbContext dbContext)
-                {
-                    await dbContext.SaveChangesAsync();
-                }
-            }
-        }
-
-        /// <inheritdoc />
-        public async Task<int> DeleteOlderThanAsync(DateTime cutoffDate)
-        {
-            var entitiesToDelete = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
-                .Where(x => x.Timestamp < cutoffDate)
-                .ToListAsync();
-
-            if (entitiesToDelete.Any())
-            {
-                _db.Set<Piranha.Data.Audit.StateChangeRecord>().RemoveRange(entitiesToDelete);
-                
-                if (_db is DbContext dbContext)
-                {
-                    await dbContext.SaveChangesAsync();
-                }
-            }
-
-            return entitiesToDelete.Count;
         }
 
         private static Piranha.Audit.Models.StateChangeRecord Transform(Data.Audit.StateChangeRecord model)

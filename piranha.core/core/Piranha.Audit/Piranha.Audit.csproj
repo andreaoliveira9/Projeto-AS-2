@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <NoWarn>$(NoWarn);1591</NoWarn>
-    <Description>Audit and History module for Piranha CMS</Description>
+    <Description>Audit Consumer module for Piranha CMS - Consumes audit messages and stores records</Description>
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
 

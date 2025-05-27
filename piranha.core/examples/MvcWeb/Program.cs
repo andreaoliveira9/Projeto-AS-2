@@ -28,11 +28,7 @@ builder.AddPiranha(options =>
     options.UseEditorialWorkflowEF();
 
     // Audit 
-    options.UseAudit(audit => {
-        audit.EnableMessageConsumer = true;
-        audit.MessageQueueCapacity = 1000;
-        audit.DefaultRetentionDays = 365;
-    });
+    options.UseAudit();
     options.UseAuditEF();
 
     options.UseFileStorage(naming: Piranha.Local.FileStorageNaming.UniqueFolderNames);

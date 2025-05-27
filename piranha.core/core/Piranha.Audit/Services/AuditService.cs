@@ -18,6 +18,7 @@ namespace Piranha.Audit.Services;
 
 /// <summary>
 /// Default implementation of the audit service.
+/// Focused on consuming messages and storing audit records.
 /// </summary>
 public sealed class AuditService : IAuditService
 {
@@ -42,20 +43,29 @@ public sealed class AuditService : IAuditService
     {
         try
         {
-            await LogStateChangeAsync(
-                stateChangedEvent.WorkflowInstanceId,
-                stateChangedEvent.ContentId,
-                stateChangedEvent.ContentType,
-                stateChangedEvent.FromState,
-                stateChangedEvent.ToState,
-                stateChangedEvent.UserId,
-                stateChangedEvent.Username,
-                stateChangedEvent.Comments,
-                stateChangedEvent.TransitionRuleId,
-                stateChangedEvent.IsAutomaticTransition,
-                JsonSerializer.Serialize(stateChangedEvent.Metadata),
-                stateChangedEvent.Success,
-                stateChangedEvent.ErrorMessage);
+            // Create state change record from event
+            var stateChangeRecord = new StateChangeRecord
+            {
+                Id = Guid.NewGuid(),
+                WorkflowInstanceId = stateChangedEvent.WorkflowInstanceId,
+                ContentId = stateChangedEvent.ContentId,
+                ContentType = stateChangedEvent.ContentType,
+                FromState = stateChangedEvent.FromState,
+                ToState = stateChangedEvent.ToState,
+                UserId = stateChangedEvent.UserId,
+                Username = stateChangedEvent.Username,
+                Timestamp = stateChangedEvent.Timestamp,
+                Comments = stateChangedEvent.Comments,
+                TransitionRuleId = stateChangedEvent.TransitionRuleId,
+                Metadata = JsonSerializer.Serialize(stateChangedEvent.Metadata),
+                Success = stateChangedEvent.Success,
+                ErrorMessage = stateChangedEvent.ErrorMessage
+            };
+
+            await _stateChangeRecordRepository.SaveAsync(stateChangeRecord);
+            
+            _logger.LogInformation("State change logged for content {ContentId} from {FromState} to {ToState} by user {UserId}",
+                stateChangedEvent.ContentId, stateChangedEvent.FromState, stateChangedEvent.ToState, stateChangedEvent.UserId);
         }
         catch (Exception ex)
         {
@@ -66,61 +76,8 @@ public sealed class AuditService : IAuditService
     }
 
     /// <inheritdoc />
-    public async Task LogStateChangeAsync(
-        Guid workflowInstanceId,
-        Guid contentId,
-        string contentType,
-        string fromState,
-        string toState,
-        string userId,
-        string username,
-        string comments = null,
-        Guid? transitionRuleId = null,
-        bool isAutomaticTransition = false,
-        string metadata = null,
-        bool success = true,
-        string errorMessage = null)
-    {
-        // Create state change record
-        var stateChangeRecord = new StateChangeRecord
-        {
-            Id = Guid.NewGuid(),
-            WorkflowInstanceId = workflowInstanceId,
-            ContentId = contentId,
-            ContentType = contentType,
-            FromState = fromState,
-            ToState = toState,
-            UserId = userId,
-            Username = username,
-            Timestamp = DateTime.UtcNow,
-            Comments = comments,
-            TransitionRuleId = transitionRuleId,
-            Metadata = metadata,
-            Success = success,
-            ErrorMessage = errorMessage
-        };
-
-        await _stateChangeRecordRepository.SaveAsync(stateChangeRecord);
-        _logger.LogInformation("State change logged for content {ContentId} from {FromState} to {ToState} by user {UserId}",
-            contentId, fromState, toState, userId);
-    }
-
-    /// <inheritdoc />
     public async Task<IEnumerable<StateChangeRecord>> GetStateChangeHistoryAsync(Guid contentId)
     {
         return await _stateChangeRecordRepository.GetByContentAsync(contentId);
-    }
-
-    /// <inheritdoc />
-    public async Task<int> CleanupOldRecordsAsync(int retentionDays = 365)
-    {
-        var cutoffDate = DateTime.UtcNow.AddDays(-retentionDays);
-        
-        var stateChangeDeleted = await _stateChangeRecordRepository.DeleteOlderThanAsync(cutoffDate);
-        
-        _logger.LogInformation("Cleanup completed. Deleted {TotalDeleted} state change records older than {CutoffDate}",
-            stateChangeDeleted, cutoffDate);
-        
-        return stateChangeDeleted;
     }
 }
