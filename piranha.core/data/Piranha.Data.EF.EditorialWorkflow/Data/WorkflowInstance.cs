@@ -39,7 +39,7 @@ public sealed class WorkflowInstance
     /// <summary>
     /// Gets/sets the current status of the workflow instance.
     /// </summary>
-    public WorkflowInstanceStatus Status { get; set; } = WorkflowInstanceStatus.Active;
+    public WorkflowInstanceStatus? Status { get; set; } = WorkflowInstanceStatus.Active;
 
     /// <summary>
     /// Gets/sets the user who initiated this workflow instance.
