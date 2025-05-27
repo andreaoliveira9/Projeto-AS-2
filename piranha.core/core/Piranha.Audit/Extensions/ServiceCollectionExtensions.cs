@@ -21,29 +21,6 @@ namespace Piranha.Audit.Extensions;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// Adds the Audit services to the service collection.
-    /// Consumes messages from RabbitMQ message queue.
-    /// </summary>
-    /// <param name="services">The service collection</param>
-    /// <param name="configuration">The configuration</param>
-    /// <returns>The service collection</returns>
-    public static IServiceCollection AddAudit(this IServiceCollection services, IConfiguration configuration)
-    {
-        // Configure RabbitMQ options
-        services.Configure<RabbitMQOptions>(configuration.GetSection(RabbitMQOptions.SectionName));
-
-        // Register core audit service - only for consuming messages
-        services.AddScoped<IAuditService, AuditService>();
-
-        // Register RabbitMQ connection service
-        services.AddSingleton<IRabbitMQConnectionService, RabbitMQConnectionService>();
-
-        // Register background service for consuming audit messages from RabbitMQ
-        services.AddHostedService<AuditMessageConsumerService>();
-
-        return services;
-    }
 
     /// <summary>
     /// Adds the Audit services to the service collection with custom RabbitMQ options.
@@ -66,6 +43,9 @@ public static class ServiceCollectionExtensions
         // Register background service for consuming audit messages from RabbitMQ
         services.AddHostedService<AuditMessageConsumerService>();
 
+        // Register controllers
+        services.AddControllers();
+
         return services;
     }
 }
@@ -75,19 +55,6 @@ public static class ServiceCollectionExtensions
 /// </summary>
 public static class PiranhaServiceBuilderExtensions
 {
-    /// <summary>
-    /// Uses the Audit services for consuming messages from RabbitMQ.
-    /// </summary>
-    /// <param name="serviceBuilder">The service builder</param>
-    /// <param name="configuration">The configuration</param>
-    /// <returns>The updated builder</returns>
-    public static PiranhaServiceBuilder UseAudit(this PiranhaServiceBuilder serviceBuilder, IConfiguration configuration)
-    {
-        serviceBuilder.Services.AddAudit(configuration);
-        
-        return serviceBuilder;
-    }
-
     /// <summary>
     /// Uses the Audit services for consuming messages from RabbitMQ with custom options.
     /// </summary>
