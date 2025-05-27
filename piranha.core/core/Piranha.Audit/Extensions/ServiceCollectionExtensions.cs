@@ -37,6 +37,9 @@ public static class ServiceCollectionExtensions
         // Register core audit service
         services.AddScoped<IAuditService, AuditService>();
 
+        // Register audit message publisher
+        services.AddScoped<IAuditMessagePublisher, AuditMessagePublisher>();
+
         // Register message queue channel for audit events
         services.AddSingleton(provider =>
         {
@@ -53,6 +56,12 @@ public static class ServiceCollectionExtensions
         if (options.EnableMessageConsumer)
         {
             services.AddHostedService<AuditMessageConsumerService>();
+        }
+
+        // Register background service for automatic cleanup
+        if (options.EnableAutomaticCleanup)
+        {
+            services.AddHostedService<AuditCleanupService>();
         }
 
         return services;

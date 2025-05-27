@@ -48,16 +48,29 @@ public sealed class AuditMessageConsumerService : BackgroundService
     {
         _logger.LogInformation("Audit message consumer service started");
 
-        await foreach (var message in _messageQueue.Reader.ReadAllAsync(stoppingToken))
+        try
         {
-            try
+            await foreach (var message in _messageQueue.Reader.ReadAllAsync(stoppingToken))
             {
-                await ProcessMessageAsync(message, stoppingToken);
+                try
+                {
+                    await ProcessMessageAsync(message, stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to process audit message: {Message}", 
+                        message?.Length > 200 ? message[..200] + "..." : message);
+                    // Continue processing other messages even if one fails
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to process audit message: {Message}", message);
-            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Audit message consumer service cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Audit message consumer service encountered an unexpected error");
         }
 
         _logger.LogInformation("Audit message consumer service stopped");
@@ -89,11 +102,30 @@ public sealed class AuditMessageConsumerService : BackgroundService
     {
         try
         {
-            return JsonSerializer.Deserialize<WorkflowStateChangedEvent>(message);
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                _logger.LogWarning("Received null or empty message");
+                return null;
+            }
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            return JsonSerializer.Deserialize<WorkflowStateChangedEvent>(message, options);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize workflow state changed event from message: {MessagePreview}", 
+                message?.Length > 200 ? message[..200] + "..." : message);
+            return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deserialize workflow state changed event from message: {Message}", message);
+            _logger.LogError(ex, "Unexpected error while deserializing message: {MessagePreview}", 
+                message?.Length > 200 ? message[..200] + "..." : message);
             return null;
         }
     }
