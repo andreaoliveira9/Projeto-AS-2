@@ -5,6 +5,8 @@ using Piranha.AspNetCore.Identity.SQLite;
 using Piranha.AttributeBuilder;
 using Piranha.Data.EF.EditorialWorkflow;
 using Piranha.EditorialWorkflow.Extensions;
+using Piranha.Data.EF.Audit;
+using Piranha.Audit.Extensions;
 using Piranha.Manager.Editor;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,9 +26,15 @@ builder.AddPiranha(options =>
     
     // Editorial Workflow
     options.UseEditorialWorkflow();
-    
-    // Register EF repositories
     options.UseEditorialWorkflowEF();
+
+    // Audit 
+    options.UseAudit(audit => {
+        audit.EnableMessageConsumer = true;
+        audit.MessageQueueCapacity = 1000;
+        audit.DefaultRetentionDays = 365;
+    });
+    options.UseAuditEF();
 
     options.UseFileStorage(naming: Piranha.Local.FileStorageNaming.UniqueFolderNames);
     options.UseImageSharp();
@@ -40,6 +48,7 @@ builder.AddPiranha(options =>
         db.ConfigureWarnings(warnings =>
             warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     });
+    
     options.UseIdentityWithSeed<IdentitySQLiteDb>(db => db.UseSqlite(connectionString));
 
     /**
