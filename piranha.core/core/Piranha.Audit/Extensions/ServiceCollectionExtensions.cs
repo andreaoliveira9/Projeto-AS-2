@@ -43,9 +43,6 @@ public static class ServiceCollectionExtensions
         // Register background service for consuming audit messages from RabbitMQ
         services.AddHostedService<AuditMessageConsumerService>();
 
-        // Register controllers
-        services.AddControllers();
-
         return services;
     }
 }

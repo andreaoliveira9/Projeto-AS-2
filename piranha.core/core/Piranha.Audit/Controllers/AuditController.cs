@@ -84,6 +84,58 @@ public class AuditController : ControllerBase
     }
 
     /// <summary>
+    /// Gets a summary of audit information for a specific content.
+    /// </summary>
+    /// <param name="contentId">The content ID</param>
+    /// <returns>Audit summary information</returns>
+    [HttpGet("content/{contentId:guid}/summary")]
+    [ProducesResponseType(typeof(AuditSummaryDto), 200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(400)]
+    public async Task<ActionResult<AuditSummaryDto>> GetContentSummary(Guid contentId)
+    {
+        try
+        {
+            if (contentId == Guid.Empty)
+            {
+                return BadRequest("Content ID cannot be empty");
+            }
+
+            _logger.LogInformation("Retrieving audit summary for content {ContentId}", contentId);
+
+            var records = await _auditService.GetStateChangeHistoryAsync(contentId);
+            var recordsList = records.OrderByDescending(r => r.Timestamp).ToList();
+
+            if (!recordsList.Any())
+            {
+                _logger.LogInformation("No audit records found for content {ContentId}", contentId);
+                return NotFound($"No audit history found for content {contentId}");
+            }
+
+            var summary = new AuditSummaryDto
+            {
+                ContentId = contentId,
+                TotalChanges = recordsList.Count,
+                LastChange = recordsList.FirstOrDefault()?.Timestamp,
+                LastChangedBy = recordsList.FirstOrDefault()?.Username,
+                CurrentState = recordsList.FirstOrDefault()?.ToState,
+                SuccessfulChanges = recordsList.Count(r => r.Success),
+                FailedChanges = recordsList.Count(r => !r.Success)
+            };
+
+            _logger.LogInformation("Generated audit summary for content {ContentId}: {TotalChanges} total changes", 
+                contentId, summary.TotalChanges);
+            
+            return Ok(summary);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving audit summary for content {ContentId}", contentId);
+            return StatusCode(500, "An error occurred while retrieving audit summary");
+        }
+    }
+
+    /// <summary>
     /// Maps a StateChangeRecord to StateChangeRecordDto.
     /// </summary>
     /// <param name="record">The state change record</param>
@@ -184,4 +236,45 @@ public class StateChangeRecordDto
     /// Gets/sets additional metadata as JSON.
     /// </summary>
     public string? Metadata { get; set; }
+}
+
+/// <summary>
+/// DTO for audit summary information.
+/// </summary>
+public class AuditSummaryDto
+{
+    /// <summary>
+    /// Gets/sets the content ID.
+    /// </summary>
+    public Guid ContentId { get; set; }
+
+    /// <summary>
+    /// Gets/sets the total number of changes.
+    /// </summary>
+    public int TotalChanges { get; set; }
+
+    /// <summary>
+    /// Gets/sets the last change timestamp.
+    /// </summary>
+    public DateTime? LastChange { get; set; }
+
+    /// <summary>
+    /// Gets/sets who made the last change.
+    /// </summary>
+    public string? LastChangedBy { get; set; }
+
+    /// <summary>
+    /// Gets/sets the current state.
+    /// </summary>
+    public string? CurrentState { get; set; }
+
+    /// <summary>
+    /// Gets/sets the number of successful changes.
+    /// </summary>
+    public int SuccessfulChanges { get; set; }
+
+    /// <summary>
+    /// Gets/sets the number of failed changes.
+    /// </summary>
+    public int FailedChanges { get; set; }
 }
