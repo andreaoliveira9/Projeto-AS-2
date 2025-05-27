@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Piranha;
+using Piranha.Data.Audit;
 using Piranha.Data.EditorialWorkflow;
+using Piranha.Data.EditorialWorkflowAndAudit;
 
 namespace MvcWeb.Data;
 
-public class SQLiteWorkflowDb : Db<SQLiteWorkflowDb>, IEditorialWorkflowDb
+public class SQLiteModulesDb : Db<SQLiteModulesDb>, IEditorialWorkflowDb
 {
     public DbSet<WorkflowDefinition> WorkflowDefinitions { get; set; }
     public DbSet<WorkflowState> WorkflowStates { get; set; }
@@ -12,13 +14,15 @@ public class SQLiteWorkflowDb : Db<SQLiteWorkflowDb>, IEditorialWorkflowDb
     public DbSet<WorkflowInstance> WorkflowInstances { get; set; }
     public DbSet<WorkflowContentExtension> WorkflowContentExtensions { get; set; }
 
-    public SQLiteWorkflowDb(DbContextOptions<SQLiteWorkflowDb> options) : base(options) { }
+    public DbSet<StateChangeRecord> StateChangeRecord { get; set; }
+
+    public SQLiteModulesDb(DbContextOptions<SQLiteModulesDb> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        
+
         // Use the official Editorial Workflow configuration
-        modelBuilder.ConfigureEditorialWorkflow();
+        modelBuilder.ConfigureEditorialWorkflowAndAudit();
     }
 }

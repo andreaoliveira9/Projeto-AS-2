@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <NoWarn>$(NoWarn);1591</NoWarn>
-    <Description>Audit and History data components for Entity Framework Core</Description>
+    <Description>Editorial Workflow data components for Entity Framework Core</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\core\Piranha.EditorialWorkflow\Piranha.EditorialWorkflow.csproj" />
     <ProjectReference Include="..\..\core\Piranha.Audit\Piranha.Audit.csproj" />
     <ProjectReference Include="..\Piranha.Data.EF\Piranha.Data.EF.csproj" />
   </ItemGroup>

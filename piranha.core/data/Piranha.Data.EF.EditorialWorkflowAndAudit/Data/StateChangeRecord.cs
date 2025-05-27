@@ -8,7 +8,7 @@
  *
  */
 
-namespace Piranha.Data.EF.Audit;
+namespace Piranha.Data.Audit;
 
 /// <summary>
 /// Entity Framework data model for state change records.

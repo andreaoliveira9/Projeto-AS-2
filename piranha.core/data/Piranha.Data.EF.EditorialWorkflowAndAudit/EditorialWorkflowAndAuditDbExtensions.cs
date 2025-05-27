@@ -10,7 +10,10 @@
 
 using Microsoft.EntityFrameworkCore;
 
-namespace Piranha.Data.EditorialWorkflow;
+namespace Piranha.Data.EditorialWorkflowAndAudit;
+
+using Piranha.Data.EditorialWorkflow;
+using Piranha.Data.Audit;
 
 /// <summary>
 /// Interface for the Editorial Workflow database context.
@@ -46,13 +49,13 @@ public interface IEditorialWorkflowDb
 /// <summary>
 /// Extensions for configuring Editorial Workflow tables in an existing DbContext.
 /// </summary>
-public static class EditorialWorkflowDbExtensions
+public static class EditorialWorkflowAndAuditDbExtensions
 {
     /// <summary>
     /// Configures the Editorial Workflow entities in the model builder.
     /// </summary>
     /// <param name="modelBuilder">The model builder</param>
-    public static void ConfigureEditorialWorkflow(this ModelBuilder modelBuilder)
+    public static void ConfigureEditorialWorkflowAndAudit(this ModelBuilder modelBuilder)
     {
         // Configure table names with prefix
         modelBuilder.Entity<WorkflowDefinition>().ToTable("Piranha_WorkflowDefinitions");
@@ -165,5 +168,35 @@ public static class EditorialWorkflowDbExtensions
             .WithMany()
             .HasForeignKey(e => e.CurrentWorkflowInstanceId)
             .OnDelete(DeleteBehavior.SetNull);
+        
+        // Configure table name with prefix
+        modelBuilder.Entity<StateChangeRecord>().ToTable("Piranha_StateChangeRecords");
+
+        // StateChangeRecord configuration
+        var stateChangeRecord = modelBuilder.Entity<StateChangeRecord>();
+        stateChangeRecord.HasKey(s => s.Id);
+        stateChangeRecord.Property(s => s.WorkflowInstanceId).IsRequired();
+        stateChangeRecord.Property(s => s.ContentId).IsRequired();
+        stateChangeRecord.Property(s => s.ContentType).IsRequired().HasMaxLength(50);
+        stateChangeRecord.Property(s => s.FromState).HasMaxLength(100);
+        stateChangeRecord.Property(s => s.ToState).IsRequired().HasMaxLength(100);
+        stateChangeRecord.Property(s => s.UserId).IsRequired().HasMaxLength(450);
+        stateChangeRecord.Property(s => s.Username).HasMaxLength(256);
+        stateChangeRecord.Property(s => s.Timestamp).IsRequired();
+        stateChangeRecord.Property(s => s.Comments).HasMaxLength(1000);
+        stateChangeRecord.Property(s => s.TransitionRuleId);
+        stateChangeRecord.Property(s => s.Metadata).HasColumnType("TEXT");
+        stateChangeRecord.Property(s => s.Success).IsRequired().HasDefaultValue(true);
+        stateChangeRecord.Property(s => s.ErrorMessage).HasMaxLength(2000);
+        
+        // Indexes for better query performance
+        stateChangeRecord.HasIndex(s => s.WorkflowInstanceId);
+        stateChangeRecord.HasIndex(s => s.ContentId);
+        stateChangeRecord.HasIndex(s => new { s.ContentId, s.Timestamp });
+        stateChangeRecord.HasIndex(s => s.UserId);
+        stateChangeRecord.HasIndex(s => s.Timestamp);
+        stateChangeRecord.HasIndex(s => new { s.FromState, s.ToState });
+        stateChangeRecord.HasIndex(s => s.TransitionRuleId);
+        stateChangeRecord.HasIndex(s => s.Success);
     }
 }

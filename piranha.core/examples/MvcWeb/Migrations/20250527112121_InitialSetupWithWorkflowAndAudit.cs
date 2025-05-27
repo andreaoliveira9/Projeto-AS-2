@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MvcWeb.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialSetupWithWorkflow : Migration
+    public partial class InitialSetupWithWorkflowAndAudit : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -149,6 +149,30 @@ namespace MvcWeb.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Piranha_SiteTypes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Piranha_StateChangeRecords",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    WorkflowInstanceId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ContentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ContentType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    FromState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    ToState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    UserId = table.Column<string>(type: "TEXT", maxLength: 450, nullable: false),
+                    Username = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    Timestamp = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    Comments = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
+                    TransitionRuleId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    Metadata = table.Column<string>(type: "TEXT", nullable: true),
+                    Success = table.Column<bool>(type: "INTEGER", nullable: false, defaultValue: true),
+                    ErrorMessage = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Piranha_StateChangeRecords", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -584,7 +608,7 @@ namespace MvcWeb.Migrations
                     ContentId = table.Column<string>(type: "TEXT", maxLength: 450, nullable: false),
                     ContentType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
                     ContentTitle = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
-                    Status = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 1),
+                    Status = table.Column<int>(type: "INTEGER", nullable: true, defaultValue: 1),
                     CreatedBy = table.Column<string>(type: "TEXT", maxLength: 450, nullable: false),
                     Created = table.Column<DateTime>(type: "TEXT", nullable: false),
                     LastModified = table.Column<DateTime>(type: "TEXT", nullable: false),
@@ -1240,6 +1264,46 @@ namespace MvcWeb.Migrations
                 column: "LanguageId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_ContentId",
+                table: "Piranha_StateChangeRecords",
+                column: "ContentId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_ContentId_Timestamp",
+                table: "Piranha_StateChangeRecords",
+                columns: new[] { "ContentId", "Timestamp" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_FromState_ToState",
+                table: "Piranha_StateChangeRecords",
+                columns: new[] { "FromState", "ToState" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_Success",
+                table: "Piranha_StateChangeRecords",
+                column: "Success");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_Timestamp",
+                table: "Piranha_StateChangeRecords",
+                column: "Timestamp");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_TransitionRuleId",
+                table: "Piranha_StateChangeRecords",
+                column: "TransitionRuleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_UserId",
+                table: "Piranha_StateChangeRecords",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_WorkflowInstanceId",
+                table: "Piranha_StateChangeRecords",
+                column: "WorkflowInstanceId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Piranha_Tags_BlogId_Slug",
                 table: "Piranha_Tags",
                 columns: new[] { "BlogId", "Slug" },
@@ -1434,6 +1498,9 @@ namespace MvcWeb.Migrations
 
             migrationBuilder.DropTable(
                 name: "Piranha_SiteTypes");
+
+            migrationBuilder.DropTable(
+                name: "Piranha_StateChangeRecords");
 
             migrationBuilder.DropTable(
                 name: "Piranha_TransitionRules");

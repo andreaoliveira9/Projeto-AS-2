@@ -9,8 +9,8 @@ using MvcWeb.Data;
 
 namespace MvcWeb.Migrations
 {
-    [DbContext(typeof(SQLiteWorkflowDb))]
-    partial class SQLiteWorkflowDbModelSnapshot : ModelSnapshot
+    [DbContext(typeof(SQLiteModulesDb))]
+    partial class SQLiteModulesDbModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
@@ -51,6 +51,84 @@ namespace MvcWeb.Migrations
                         .IsUnique();
 
                     b.ToTable("Piranha_Aliases", (string)null);
+                });
+
+            modelBuilder.Entity("Piranha.Data.Audit.StateChangeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FromState")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Success")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ToState")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("TransitionRuleId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("WorkflowInstanceId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentId");
+
+                    b.HasIndex("Success");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("TransitionRuleId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("WorkflowInstanceId");
+
+                    b.HasIndex("ContentId", "Timestamp");
+
+                    b.HasIndex("FromState", "ToState");
+
+                    b.ToTable("Piranha_StateChangeRecords", (string)null);
                 });
 
             modelBuilder.Entity("Piranha.Data.Block", b =>
@@ -611,7 +689,7 @@ namespace MvcWeb.Migrations
                     b.Property<string>("Metadata")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Status")
+                    b.Property<int?>("Status")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(1);

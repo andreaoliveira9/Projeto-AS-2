@@ -3,11 +3,10 @@ using MvcWeb.Data;
 using Piranha;
 using Piranha.AspNetCore.Identity.SQLite;
 using Piranha.AttributeBuilder;
-using Piranha.Data.EF.EditorialWorkflow;
 using Piranha.EditorialWorkflow.Extensions;
-using Piranha.Data.EF.Audit;
 using Piranha.Audit.Extensions;
 using Piranha.Manager.Editor;
+using Piranha.Data.EF.EditorialWorkflowAndAudit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,7 +41,7 @@ builder.AddPiranha(options =>
     options.UseMemoryCache();
 
     var connectionString = builder.Configuration.GetConnectionString("piranha");
-    options.UseEF<SQLiteWorkflowDb>(db => {
+    options.UseEF<SQLiteModulesDb>(db => {
         db.UseSqlite(connectionString);
         // Suppress the pending model changes warning
         db.ConfigureWarnings(warnings =>
