@@ -34,54 +34,34 @@ public static class AuditDbExtensions
     /// <param name="modelBuilder">The model builder</param>
     public static void ConfigureAudit(this ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<StateChangeRecord>(entity =>
-        {
-            entity.ToTable("Piranha_StateChangeRecords");
-            entity.HasKey(e => e.Id);
-            
-            entity.Property(e => e.Id)
-                .IsRequired();
-            
-            entity.Property(e => e.WorkflowInstanceId)
-                .IsRequired();
-            
-            entity.Property(e => e.ContentId)
-                .IsRequired();
-            
-            entity.Property(e => e.ContentType)
-                .HasMaxLength(255)
-                .IsRequired();
-            
-            entity.Property(e => e.FromState)
-                .HasMaxLength(255);
-            
-            entity.Property(e => e.ToState)
-                .HasMaxLength(255)
-                .IsRequired();
-            
-            entity.Property(e => e.UserId)
-                .HasMaxLength(128);
-            
-            entity.Property(e => e.Username)
-                .HasMaxLength(255);
-            
-            entity.Property(e => e.Timestamp)
-                .IsRequired();
-            
-            entity.Property(e => e.Comments)
-                .HasMaxLength(1000);
-            
-            entity.Property(e => e.Metadata)
-                .HasColumnType("TEXT");
-            
-            entity.Property(e => e.ErrorMessage)
-                .HasMaxLength(1000);
+        // Configure table name with prefix
+        modelBuilder.Entity<StateChangeRecord>().ToTable("Piranha_StateChangeRecords");
 
-            entity.HasIndex(e => e.ContentId);
-            entity.HasIndex(e => e.WorkflowInstanceId);
-            entity.HasIndex(e => e.UserId);
-            entity.HasIndex(e => e.Timestamp);
-            entity.HasIndex(e => new { e.FromState, e.ToState });
-        });
+        // StateChangeRecord configuration
+        var stateChangeRecord = modelBuilder.Entity<StateChangeRecord>();
+        stateChangeRecord.HasKey(s => s.Id);
+        stateChangeRecord.Property(s => s.WorkflowInstanceId).IsRequired();
+        stateChangeRecord.Property(s => s.ContentId).IsRequired();
+        stateChangeRecord.Property(s => s.ContentType).IsRequired().HasMaxLength(50);
+        stateChangeRecord.Property(s => s.FromState).HasMaxLength(100);
+        stateChangeRecord.Property(s => s.ToState).IsRequired().HasMaxLength(100);
+        stateChangeRecord.Property(s => s.UserId).IsRequired().HasMaxLength(450);
+        stateChangeRecord.Property(s => s.Username).HasMaxLength(256);
+        stateChangeRecord.Property(s => s.Timestamp).IsRequired();
+        stateChangeRecord.Property(s => s.Comments).HasMaxLength(1000);
+        stateChangeRecord.Property(s => s.TransitionRuleId);
+        stateChangeRecord.Property(s => s.Metadata).HasColumnType("nvarchar(max)");
+        stateChangeRecord.Property(s => s.Success).IsRequired().HasDefaultValue(true);
+        stateChangeRecord.Property(s => s.ErrorMessage).HasMaxLength(2000);
+        
+        // Indexes for better query performance
+        stateChangeRecord.HasIndex(s => s.WorkflowInstanceId);
+        stateChangeRecord.HasIndex(s => s.ContentId);
+        stateChangeRecord.HasIndex(s => new { s.ContentId, s.Timestamp });
+        stateChangeRecord.HasIndex(s => s.UserId);
+        stateChangeRecord.HasIndex(s => s.Timestamp);
+        stateChangeRecord.HasIndex(s => new { s.FromState, s.ToState });
+        stateChangeRecord.HasIndex(s => s.TransitionRuleId);
+        stateChangeRecord.HasIndex(s => s.Success);
     }
 }
