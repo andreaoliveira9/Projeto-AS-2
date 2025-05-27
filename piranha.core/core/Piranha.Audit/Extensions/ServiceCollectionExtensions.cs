@@ -8,20 +8,21 @@
  *
  */
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Piranha;
 using Piranha.Audit.Configuration;
 using Piranha.Audit.Services;
 
 namespace Piranha.Audit.Extensions;
 
+
 /// <summary>
 /// Extension methods for setting up Audit services.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-
+    
     /// <summary>
     /// Adds the Audit services to the service collection with custom RabbitMQ options.
     /// Consumes messages from RabbitMQ message queue.
@@ -31,6 +32,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection</returns>
     public static IServiceCollection AddAudit(this IServiceCollection services, Action<RabbitMQOptions> configureOptions)
     {
+
         // Configure RabbitMQ options
         services.Configure(configureOptions);
 
@@ -61,7 +63,7 @@ public static class PiranhaServiceBuilderExtensions
     public static PiranhaServiceBuilder UseAudit(this PiranhaServiceBuilder serviceBuilder, Action<RabbitMQOptions> configureOptions)
     {
         serviceBuilder.Services.AddAudit(configureOptions);
-        
+
         return serviceBuilder;
     }
 }

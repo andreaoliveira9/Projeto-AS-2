@@ -366,39 +366,52 @@
                 </style>
 
                 <script>
-                    let auditLoading = false;
-                    let auditHistory = [];
-                    let auditSummary = null;
+                    // Audit History JavaScript - Pure JS without template literals
+                    var auditLoading = false;
+                    var auditHistory = [];
+                    var auditSummary = null;
 
                     function showAuditLoading() {
-                        document.getElementById('audit-loading').style.display = 'block';
-                        document.getElementById('audit-error').style.display = 'none';
-                        document.getElementById('audit-summary').style.display = 'none';
-                        document.getElementById('audit-timeline').style.display = 'none';
-                        document.getElementById('audit-no-data').style.display = 'none';
+                        var loadingEl = document.getElementById('audit-loading');
+                        var errorEl = document.getElementById('audit-error');
+                        var summaryEl = document.getElementById('audit-summary');
+                        var timelineEl = document.getElementById('audit-timeline');
+                        var noDataEl = document.getElementById('audit-no-data');
+                        var refreshIcon = document.getElementById('audit-refresh-icon');
+                        var refreshBtn = document.getElementById('audit-refresh-btn');
                         
-                        const refreshIcon = document.getElementById('audit-refresh-icon');
-                        refreshIcon.classList.add('fa-spin');
-                        document.getElementById('audit-refresh-btn').disabled = true;
+                        if (loadingEl) loadingEl.style.display = 'block';
+                        if (errorEl) errorEl.style.display = 'none';
+                        if (summaryEl) summaryEl.style.display = 'none';
+                        if (timelineEl) timelineEl.style.display = 'none';
+                        if (noDataEl) noDataEl.style.display = 'none';
+                        if (refreshIcon) refreshIcon.classList.add('fa-spin');
+                        if (refreshBtn) refreshBtn.disabled = true;
                     }
 
                     function hideAuditLoading() {
-                        document.getElementById('audit-loading').style.display = 'none';
+                        var loadingEl = document.getElementById('audit-loading');
+                        var refreshIcon = document.getElementById('audit-refresh-icon');
+                        var refreshBtn = document.getElementById('audit-refresh-btn');
                         
-                        const refreshIcon = document.getElementById('audit-refresh-icon');
-                        refreshIcon.classList.remove('fa-spin');
-                        document.getElementById('audit-refresh-btn').disabled = false;
+                        if (loadingEl) loadingEl.style.display = 'none';
+                        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+                        if (refreshBtn) refreshBtn.disabled = false;
                     }
 
                     function showAuditError(message) {
                         hideAuditLoading();
-                        document.getElementById('audit-error-message').textContent = message;
-                        document.getElementById('audit-error').style.display = 'block';
+                        var errorMsg = document.getElementById('audit-error-message');
+                        var errorEl = document.getElementById('audit-error');
+                        
+                        if (errorMsg) errorMsg.textContent = message;
+                        if (errorEl) errorEl.style.display = 'block';
                     }
 
                     function showAuditNoData() {
                         hideAuditLoading();
-                        document.getElementById('audit-no-data').style.display = 'block';
+                        var noDataEl = document.getElementById('audit-no-data');
+                        if (noDataEl) noDataEl.style.display = 'block';
                     }
 
                     function formatAuditDate(dateString) {
@@ -411,168 +424,235 @@
                     }
 
                     function updateAuditSummary(summary) {
-                        document.getElementById('audit-total-changes').textContent = summary.totalChanges || 0;
-                        document.getElementById('audit-successful-changes').textContent = summary.successfulChanges || 0;
-                        document.getElementById('audit-failed-changes').textContent = summary.failedChanges || 0;
-                        document.getElementById('audit-current-state').textContent = summary.currentState || 'N/A';
-                        document.getElementById('audit-last-user').textContent = summary.lastChangedBy || 'N/A';
-                        document.getElementById('audit-last-change').textContent = formatAuditDate(summary.lastChange);
+                        var elements = {
+                            'audit-total-changes': summary.totalChanges || 0,
+                            'audit-successful-changes': summary.successfulChanges || 0,
+                            'audit-failed-changes': summary.failedChanges || 0,
+                            'audit-current-state': summary.currentState || 'N/A',
+                            'audit-last-user': summary.lastChangedBy || 'N/A',
+                            'audit-last-change': formatAuditDate(summary.lastChange)
+                        };
                         
-                        document.getElementById('audit-summary').style.display = 'block';
+                        for (var id in elements) {
+                            var el = document.getElementById(id);
+                            if (el) el.textContent = elements[id];
+                        }
+                        
+                        var summaryEl = document.getElementById('audit-summary');
+                        if (summaryEl) summaryEl.style.display = 'block';
                     }
 
                     function toggleAuditDetails(recordId) {
-                        const detailsElement = document.getElementById('audit-details-' + recordId);
-                        const toggleButton = document.getElementById('audit-toggle-' + recordId);
-                        const toggleIcon = document.getElementById('audit-icon-' + recordId);
+                        var detailsElement = document.getElementById('audit-details-' + recordId);
+                        var toggleButton = document.getElementById('audit-toggle-' + recordId);
                         
-                        if (detailsElement.style.display === 'none' || detailsElement.style.display === '') {
-                            detailsElement.style.display = 'block';
-                            toggleButton.innerHTML = '<i id="audit-icon-' + recordId + '" class="fas fa-chevron-up"></i> Hide Details';
-                        } else {
-                            detailsElement.style.display = 'none';
-                            toggleButton.innerHTML = '<i id="audit-icon-' + recordId + '" class="fas fa-chevron-down"></i> Show Details';
+                        if (detailsElement && toggleButton) {
+                            if (detailsElement.style.display === 'none' || detailsElement.style.display === '') {
+                                detailsElement.style.display = 'block';
+                                toggleButton.innerHTML = '<i class="fas fa-chevron-up"></i> Hide Details';
+                            } else {
+                                detailsElement.style.display = 'none';
+                                toggleButton.innerHTML = '<i class="fas fa-chevron-down"></i> Show Details';
+                            }
                         }
                     }
 
                     function renderAuditTimeline(history) {
-                        const timeline = document.getElementById('audit-timeline');
+                        var timeline = document.getElementById('audit-timeline');
+                        if (!timeline) return;
+                        
                         timeline.innerHTML = '';
 
-                        history.forEach(function(record) {
-                            const timelineItem = document.createElement('div');
+                        for (var i = 0; i < history.length; i++) {
+                            var record = history[i];
+                            var timelineItem = document.createElement('div');
                             timelineItem.className = 'timeline-item' + (record.success ? '' : ' timeline-item-error');
                             
-                            const detailsId = 'audit-details-' + record.id;
-                            const toggleId = 'audit-toggle-' + record.id;
+                            var detailsId = 'audit-details-' + record.id;
+                            var toggleId = 'audit-toggle-' + record.id;
                             
-                            timelineItem.innerHTML = [  
-                                '<div class="timeline-marker">',
-                                    '<i class="fas ' + (record.success ? 'fa-check' : 'fa-times') + '" title="' + (record.success ? 'Success' : 'Failed') + '"></i>',
-                                '</div>',
-                                '<div class="timeline-content">',
-                                    '<div class="card">',
-                                        '<div class="card-body">',
-                                            '<div class="d-flex justify-content-between align-items-start mb-2">',
-                                                '<div>',
-                                                    '<h6 class="mb-1">',
-                                                        '<i class="fas fa-arrow-right text-muted"></i>',
-                                                        'State Change: ',
-                                                        '<span class="badge badge-secondary">' + (record.fromState || 'N/A') + '</span>',
-                                                        ' → ',
-                                                        '<span class="badge badge-primary">' + (record.toState || 'N/A') + '</span>',
-                                                    '</h6>',
-                                                    '<small class="text-muted">',
-                                                        '<i class="fas fa-user"></i> ' + (record.username || record.userId),
-                                                        '<span class="mx-2">•</span>',
-                                                        '<i class="fas fa-clock"></i> ' + formatAuditDate(record.timestamp),
-                                                    '</small>',
-                                                '</div>',
-                                                '<span class="badge ' + (record.success ? 'badge-success' : 'badge-danger') + '">',
-                                                    record.success ? 'Success' : 'Failed',
-                                                '</span>',
-                                            '</div>',
-                                            record.comments ? 
-                                                '<div class="mb-2">' +
-                                                    '<small class="text-muted">' +
-                                                        '<i class="fas fa-comment"></i> Comment:' +
-                                                    '</small>' +
-                                                    '<p class="mb-0 pl-3">' + record.comments + '</p>' +
-                                                '</div>' : '',
-                                            (!record.success && record.errorMessage) ?
-                                                '<div class="alert alert-danger alert-sm mb-2">' +
-                                                    '<small>' +
-                                                        '<i class="fas fa-exclamation-triangle"></i>' +
-                                                        '<strong>Error:</strong> ' + record.errorMessage +
-                                                    '</small>' +
-                                                '</div>' : '',
-                                            '<div class="mt-2">',
-                                                '<button id="' + toggleId + '" class="details-toggle" onclick="toggleAuditDetails(\'' + record.id + '\');">',
-                                                    '<i class="fas fa-chevron-down"></i> Show Details',
-                                                '</button>',
-                                                '<div id="' + detailsId + '" class="details-content">',
-                                                    '<div class="row">',
-                                                        '<div class="col-sm-6">',
-                                                            '<small class="text-muted d-block">Content ID:</small>',
-                                                            '<code class="small">' + record.contentId + '</code>',
-                                                        '</div>',
-                                                        '<div class="col-sm-6">',
-                                                            '<small class="text-muted d-block">Content Type:</small>',
-                                                            '<span class="small">' + record.contentType + '</span>',
-                                                        '</div>',
-                                                        record.workflowInstanceId ?
-                                                            '<div class="col-sm-6 mt-2">' +
-                                                                '<small class="text-muted d-block">Workflow Instance:</small>' +
-                                                                '<code class="small">' + record.workflowInstanceId + '</code>' +
-                                                            '</div>' : '',
-                                                        record.transitionRuleId ?
-                                                            '<div class="col-sm-6 mt-2">' +
-                                                                '<small class="text-muted d-block">Transition Rule:</small>' +
-                                                                '<code class="small">' + record.transitionRuleId + '</code>' +
-                                                            '</div>' : '',
-                                                        record.metadata ?
-                                                            '<div class="col-12 mt-2">' +
-                                                                '<small class="text-muted d-block">Metadata:</small>' +
-                                                                '<pre class="small bg-light p-2 rounded">' + (typeof record.metadata === 'object' ? JSON.stringify(record.metadata, null, 2) : record.metadata) + '</pre>' +
-                                                            '</div>' : '',
-                                                    '</div>',
-                                                '</div>',
-                                            '</div>',
-                                        '</div>',
-                                    '</div>',
-                                '</div>'
-                            ].join('');
+                            var html = '';
+                            html += '<div class="timeline-marker">';
+                            html += '<i class="fas ' + (record.success ? 'fa-check' : 'fa-times') + '" title="' + (record.success ? 'Success' : 'Failed') + '"></i>';
+                            html += '</div>';
+                            html += '<div class="timeline-content">';
+                            html += '<div class="card">';
+                            html += '<div class="card-body">';
+                            html += '<div class="d-flex justify-content-between align-items-start mb-2">';
+                            html += '<div>';
+                            html += '<h6 class="mb-1">';
+                            html += '<i class="fas fa-arrow-right text-muted"></i>';
+                            html += 'State Change: ';
+                            html += '<span class="badge badge-secondary">' + (record.fromState || 'N/A') + '</span>';
+                            html += ' → ';
+                            html += '<span class="badge badge-primary">' + (record.toState || 'N/A') + '</span>';
+                            html += '</h6>';
+                            html += '<small class="text-muted">';
+                            html += '<i class="fas fa-user"></i> ' + (record.username || record.userId);
+                            html += '<span class="mx-2">•</span>';
+                            html += '<i class="fas fa-clock"></i> ' + formatAuditDate(record.timestamp);
+                            html += '</small>';
+                            html += '</div>';
+                            html += '<span class="badge ' + (record.success ? 'badge-success' : 'badge-danger') + '">';
+                            html += record.success ? 'Success' : 'Failed';
+                            html += '</span>';
+                            html += '</div>';
                             
+                            if (record.comments) {
+                                html += '<div class="mb-2">';
+                                html += '<small class="text-muted">';
+                                html += '<i class="fas fa-comment"></i> Comment:';
+                                html += '</small>';
+                                html += '<p class="mb-0 pl-3">' + record.comments + '</p>';
+                                html += '</div>';
+                            }
+                            
+                            if (!record.success && record.errorMessage) {
+                                html += '<div class="alert alert-danger alert-sm mb-2">';
+                                html += '<small>';
+                                html += '<i class="fas fa-exclamation-triangle"></i>';
+                                html += '<strong>Error:</strong> ' + record.errorMessage;
+                                html += '</small>';
+                                html += '</div>';
+                            }
+                            
+                            html += '<div class="mt-2">';
+                            html += '<button id="' + toggleId + '" class="details-toggle" onclick="toggleAuditDetails(\'' + record.id + '\')">';
+                            html += '<i class="fas fa-chevron-down"></i> Show Details';
+                            html += '</button>';
+                            html += '<div id="' + detailsId + '" class="details-content">';
+                            html += '<div class="row">';
+                            html += '<div class="col-sm-6">';
+                            html += '<small class="text-muted d-block">Content ID:</small>';
+                            html += '<code class="small">' + record.contentId + '</code>';
+                            html += '</div>';
+                            html += '<div class="col-sm-6">';
+                            html += '<small class="text-muted d-block">Content Type:</small>';
+                            html += '<span class="small">' + record.contentType + '</span>';
+                            html += '</div>';
+                            
+                            if (record.workflowInstanceId) {
+                                html += '<div class="col-sm-6 mt-2">';
+                                html += '<small class="text-muted d-block">Workflow Instance:</small>';
+                                html += '<code class="small">' + record.workflowInstanceId + '</code>';
+                                html += '</div>';
+                            }
+                            
+                            if (record.transitionRuleId) {
+                                html += '<div class="col-sm-6 mt-2">';
+                                html += '<small class="text-muted d-block">Transition Rule:</small>';
+                                html += '<code class="small">' + record.transitionRuleId + '</code>';
+                                html += '</div>';
+                            }
+                            
+                            if (record.metadata) {
+                                html += '<div class="col-12 mt-2">';
+                                html += '<small class="text-muted d-block">Metadata:</small>';
+                                var metadataStr = typeof record.metadata === 'object' ? JSON.stringify(record.metadata, null, 2) : record.metadata;
+                                html += '<pre class="small bg-light p-2 rounded">' + metadataStr + '</pre>';
+                                html += '</div>';
+                            }
+                            
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                            
+                            timelineItem.innerHTML = html;
                             timeline.appendChild(timelineItem);
-                        });
+                        }
 
                         timeline.style.display = 'block';
                     }
 
-                    async function loadAuditData() {
-                        const contentId = piranha.pageedit ? piranha.pageedit.model.id : piranha.postedit ? piranha.postedit.model.id : null;
+                    function getContentId() {
+                        // Try multiple ways to get the content ID
+                        var contentId = null;
+                        
+                        // Method 1: Check piranha.pageedit
+                        if (window.piranha && window.piranha.pageedit && window.piranha.pageedit.model && window.piranha.pageedit.model.id) {
+                            contentId = window.piranha.pageedit.model.id;
+                        }
+                        // Method 2: Check piranha.postedit  
+                        else if (window.piranha && window.piranha.postedit && window.piranha.postedit.model && window.piranha.postedit.model.id) {
+                            contentId = window.piranha.postedit.model.id;
+                        }
+                        // Method 3: Try to get from URL
+                        else {
+                            var pathParts = window.location.pathname.split('/');
+                            for (var i = 0; i < pathParts.length; i++) {
+                                if (pathParts[i] === 'edit' && pathParts[i + 1]) {
+                                    // Check if it looks like a GUID
+                                    var possibleId = pathParts[i + 1];
+                                    var guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                                    if (guidRegex.test(possibleId)) {
+                                        contentId = possibleId;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        return contentId;
+                    }
+
+                    function loadAuditData() {
+                        var contentId = getContentId();
                         
                         if (!contentId) {
-                            showAuditError('Content ID not found');
+                            showAuditError('Content ID not found. Please make sure you are editing an existing page or post.');
                             return;
                         }
 
                         console.log('Loading audit data for content ID:', contentId);
                         showAuditLoading();
 
-                        try {
-                            // Load history and summary in parallel
-                            const [historyResponse, summaryResponse] = await Promise.all([
-                                fetch(`${piranha.baseUrl}api/audit/content/${contentId}/history`, {
-                                    method: 'GET',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    credentials: 'same-origin'
-                                }),
-                                fetch(`${piranha.baseUrl}api/audit/content/${contentId}/summary`, {
-                                    method: 'GET',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    credentials: 'same-origin'
-                                })
-                            ]);
-
-                            if (historyResponse.ok) {
-                                auditHistory = await historyResponse.json();
-                                console.log('Loaded audit history:', auditHistory);
-                            } else if (historyResponse.status === 404) {
-                                auditHistory = [];
-                                console.log('No audit history found (404)');
+                        var historyUrl = (window.piranha ? window.piranha.baseUrl : '/') + 'api/audit/content/' + contentId + '/history';
+                        var summaryUrl = (window.piranha ? window.piranha.baseUrl : '/') + 'api/audit/content/' + contentId + '/summary';
+                        
+                        console.log('Fetching from URLs:', historyUrl, summaryUrl);
+                        
+                        // Load history
+                        fetch(historyUrl, {
+                            method: 'GET',
+                            headers: piranha.utils.antiForgeryHeaders()
+                        })
+                        .then(function(response) {
+                            if (response.ok) {
+                                return response.json();
+                            } else if (response.status === 404) {
+                                return [];
                             } else {
-                                throw new Error(`Failed to load history: ${historyResponse.status} ${historyResponse.statusText}`);
+                                throw new Error('Failed to load history: ' + response.status + ' ' + response.statusText);
                             }
-
-                            if (summaryResponse.ok) {
-                                auditSummary = await summaryResponse.json();
+                        })
+                        .then(function(data) {
+                            auditHistory = data;
+                            console.log('Loaded audit history:', auditHistory);
+                            
+                            // Load summary
+                            return fetch(summaryUrl, {
+                                method: 'GET',
+                                headers: piranha.utils.antiForgeryHeaders()
+                            });
+                        })
+                        .then(function(response) {
+                            if (response.ok) {
+                                return response.json();
+                            } else {
+                                console.warn('Failed to load audit summary:', response.status);
+                                return null;
+                            }
+                        })
+                        .then(function(summaryData) {
+                            if (summaryData) {
+                                auditSummary = summaryData;
                                 console.log('Loaded audit summary:', auditSummary);
                                 updateAuditSummary(auditSummary);
-                            } else {
-                                console.warn('Failed to load audit summary:', summaryResponse.status);
                             }
-
+                            
                             hideAuditLoading();
 
                             if (auditHistory && auditHistory.length > 0) {
@@ -580,22 +660,21 @@
                             } else {
                                 showAuditNoData();
                             }
-
-                        } catch (error) {
+                        })
+                        .catch(function(error) {
                             console.error('Error loading audit data:', error);
                             showAuditError(error.message || 'Failed to load audit data');
-                        }
+                        });
                     }
 
-                    // Auto-load when audit tab is selected
-                    document.addEventListener('DOMContentLoaded', function() {
-                        // Load data when page is ready
-                        setTimeout(function() {
-                            if (typeof piranha !== 'undefined') {
-                                loadAuditData();
-                            }
-                        }, 1000);
-                    });
+                    // Auto-load when page is ready
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', function() {
+                            setTimeout(loadAuditData, 2000);
+                        });
+                    } else {
+                        setTimeout(loadAuditData, 2000);
+                    }
                 </script>
             </div>
         </div>

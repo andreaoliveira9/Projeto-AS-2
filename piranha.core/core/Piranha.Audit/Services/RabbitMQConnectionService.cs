@@ -159,12 +159,8 @@ public sealed class RabbitMQConnectionService : IRabbitMQConnectionService, IDis
                         exchange: _options.ExchangeName,
                         routingKey: _options.RoutingKey,
                         arguments: null).GetAwaiter().GetResult();
-
-                    _logger.LogInformation("Declared RabbitMQ exchange '{Exchange}' and queue '{Queue}'", 
-                        _options.ExchangeName, _options.QueueName);
                 }
 
-                _logger.LogInformation("Created RabbitMQ channel");
                 return _channel;
             }
             catch (Exception ex)
