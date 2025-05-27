@@ -8,11 +8,7 @@ public class SQLiteAuditDb : Db<SQLiteAuditDb>, IAuditDb
 {
     public DbSet<StateChangeRecord> StateChangeRecord { get; set; }
 
-    public SQLiteAuditDb(DbContextOptions<SQLiteAuditDb> options) : base(options) 
-    {
-        // Ensure database is created and migrated
-        Database.EnsureCreated();
-    }
+    public SQLiteAuditDb(DbContextOptions<SQLiteAuditDb> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
