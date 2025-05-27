@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 namespace Piranha.Audit.Events;
 
 /// <summary>
@@ -34,27 +36,27 @@ public sealed class WorkflowStateChangedEvent
     /// <summary>
     /// Gets/sets the content type.
     /// </summary>
-    public string ContentType { get; set; }
+    public string ContentType { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the previous state.
     /// </summary>
-    public string FromState { get; set; }
+    public string FromState { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the new state.
     /// </summary>
-    public string ToState { get; set; }
+    public string ToState { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the user who triggered the state change.
     /// </summary>
-    public string UserId { get; set; }
+    public string UserId { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the username for quick reference.
     /// </summary>
-    public string Username { get; set; }
+    public string Username { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets when the state change occurred.
@@ -64,7 +66,7 @@ public sealed class WorkflowStateChangedEvent
     /// <summary>
     /// Gets/sets optional comments.
     /// </summary>
-    public string Comments { get; set; }
+    public string? Comments { get; set; }
 
     /// <summary>
     /// Gets/sets the transition rule id.
@@ -89,5 +91,5 @@ public sealed class WorkflowStateChangedEvent
     /// <summary>
     /// Gets/sets the error message if the action failed.
     /// </summary>
-    public string ErrorMessage { get; set; }
+    public string? ErrorMessage { get; set; }
 }

@@ -28,7 +28,13 @@ builder.AddPiranha(options =>
     options.UseEditorialWorkflowEF();
 
     // Audit 
-    options.UseAudit();
+    options.UseAudit(rabbitMQOptions => {
+        rabbitMQOptions.HostName = "localhost";
+        rabbitMQOptions.UserName = "user";
+        rabbitMQOptions.Password = "password";
+        rabbitMQOptions.QueueName = "audit.WorkflowStateChanged";
+        rabbitMQOptions.MaxRetryAttempts = 5;
+    });
     options.UseAuditEF();
 
     options.UseFileStorage(naming: Piranha.Local.FileStorageNaming.UniqueFolderNames);

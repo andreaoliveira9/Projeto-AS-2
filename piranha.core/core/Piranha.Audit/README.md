@@ -1,151 +1,123 @@
 # Piranha Audit Module
 
-O módulo de Auditoria do Piranha CMS é responsável por **consumir mensagens** de uma message queue sobre mudanças de estado de conteúdo, armazenando os registros na base de dados para auditoria e rastreamento histórico.
+O módulo de Auditoria do Piranha CMS é responsável por **consumir mensagens** de uma message queue RabbitMQ sobre mudanças de estado de conteúdo, armazenando os registros na base de dados para auditoria e rastreamento histórico.
 
 ## Objetivo
 
-Este módulo foi redesenhado para ser **exclusivamente um consumidor**:
+Este módulo foi redesenhado para ser **exclusivamente um consumidor RabbitMQ**:
 
-- **Receber mensagens** de eventos de mudança de estado através de message queue
+- **Receber mensagens** de eventos de mudança de estado através do RabbitMQ
 - **Processar StateChangeRecord** automaticamente a partir das mensagens recebidas
 - **Armazenar registros de auditoria** na base de dados
 - **Fornecer API simples** para consultar histórico por ContentID
 
-> **⚠️ Importante**: Este módulo **NÃO publica mensagens**. Ele apenas consome mensagens enviadas por outros componentes do sistema.
+> **⚠️ Importante**: Este módulo **NÃO publica mensagens**. Ele apenas consome mensagens enviadas por outros componentes do sistema através do RabbitMQ.
 
-## Arquitetura Simplificada
-
-O módulo agora tem uma arquitetura focada apenas no consumo:
+## Arquitetura
 
 ### Core (Piranha.Audit)
+- **Configuration**: `RabbitMQOptions` - Opções de configuração do RabbitMQ
 - **Models**: `StateChangeRecord` - Modelo de dados para registros de mudança de estado
-- **Events**: `WorkflowStateChangedEvent` - Evento que representa uma mudança de estado (apenas para deserialização)
+- **Events**: `WorkflowStateChangedEvent` - Evento que representa uma mudança de estado
 - **Services**: 
-  - `IAuditService` / `AuditService` - Serviço principal para processamento de mensagens recebidas
-  - `AuditMessageConsumerService` - Serviço em background que consome mensagens da fila
-- **Repositories**: `IStateChangeRecordRepository` - Interface simplificada para acesso aos dados
-
-### Data Layer (Piranha.Data.EF.EditorialWorkflowAndAudit)
-- **Data**: `StateChangeRecord` - Entidade Entity Framework
-- **Repositories**: `StateChangeRecordRepository` - Implementação EF simplificada do repositório
+  - `IAuditService` / `AuditService` - Serviço principal para processamento de mensagens
+  - `IRabbitMQConnectionService` / `RabbitMQConnectionService` - Serviço de conexão RabbitMQ
+  - `AuditMessageConsumerService` - Serviço em background que consome mensagens do RabbitMQ
 
 ## Funcionamento
 
-1. **Message Queue**: O sistema utiliza um Channel<string> interno para receber mensagens
-2. **Consumer Service**: O `AuditMessageConsumerService` roda em background consumindo mensagens
-3. **Processamento**: Cada mensagem é deserializada para `WorkflowStateChangedEvent`
-4. **Persistência**: Os eventos são convertidos em `StateChangeRecord` e salvos na base de dados
+1. **RabbitMQ Connection**: Estabelece conexão com RabbitMQ baseada na configuração
+2. **Queue Declaration**: Declara automaticamente a exchange e queue se `AutoDeclare` estiver ativo
+3. **Consumer Service**: O `AuditMessageConsumerService` consome mensagens em background
+4. **Message Processing**: Mensagens são deserializadas para `WorkflowStateChangedEvent`
+5. **Retry Logic**: Implementa retry automático com backoff configurável
+6. **Acknowledgment**: Mensagens são reconhecidas apenas após processamento bem-sucedido
+7. **Persistência**: Eventos são convertidos em `StateChangeRecord` e salvos na base de dados
 
 ## Configuração
 
-### Registro Simples
+### Via IConfiguration
 
 ```csharp
-// No Startup.cs ou Program.cs
+// appsettings.json
+{
+  "Piranha": {
+    "Audit": {
+      "RabbitMQ": {
+        "HostName": "localhost",
+        "Port": 5672,
+        "UserName": "guest",
+        "Password": "guest",
+        "QueueName": "piranha.audit.events",
+        "ExchangeName": "piranha.audit",
+        "RoutingKey": "state.changed",
+        "MaxRetryAttempts": 3,
+        "RetryDelayMs": 1000,
+        "AutoDeclare": true,
+        "QueueDurable": true
+      }
+    }
+  }
+}
+
+// Startup.cs
 services.AddPiranha(options => {
-    options.UseAudit(); // Registra o módulo de auditoria (apenas consumo)
-})
-.UseAuditEF(); // Registra os repositórios Entity Framework
+    options.UseAudit(configuration);
+});
 ```
 
-> **Nota**: Não há configurações adicionais necessárias. O módulo está configurado com valores otimizados por padrão.
+### Via Action
 
-## API de Uso (Apenas Consulta)
+```csharp
+services.AddPiranha(options => {
+    options.UseAudit(rabbitMQOptions => {
+        rabbitMQOptions.HostName = "my-rabbitmq-server";
+        rabbitMQOptions.UserName = "piranha-user";
+        rabbitMQOptions.Password = "secure-password";
+        rabbitMQOptions.QueueName = "custom.audit.queue";
+        rabbitMQOptions.MaxRetryAttempts = 5;
+    });
+});
+```
+
+## Opções de Configuração
+
+### Conexão
+- **HostName**: Hostname do RabbitMQ (padrão: "localhost")
+- **Port**: Porta de conexão (padrão: 5672)
+- **UserName**: Usuário (padrão: "guest")
+- **Password**: Senha (padrão: "guest")
+- **UseSsl**: Usar SSL/TLS (padrão: false)
+
+### Queue
+- **QueueName**: Nome da queue (padrão: "piranha.audit.events")
+- **ExchangeName**: Nome da exchange (padrão: "piranha.audit")
+- **RoutingKey**: Chave de roteamento (padrão: "state.changed")
+- **AutoDeclare**: Declarar automaticamente (padrão: true)
+- **QueueDurable**: Queue durável (padrão: true)
+
+### Retry
+- **MaxRetryAttempts**: Máximo de tentativas (padrão: 3)
+- **RetryDelayMs**: Delay entre tentativas (padrão: 1000ms)
+
+## API de Uso
 
 ### Consultar Histórico
 
 ```csharp
-// Injetar o serviço de auditoria
 private readonly IAuditService _auditService;
 
-// Obter histórico de um conteúdo específico
 var history = await _auditService.GetStateChangeHistoryAsync(contentId);
 ```
 
-### Acesso Direto ao Repositório
+## Resilência
 
-```csharp
-// Injetar o repositório
-private readonly IStateChangeRecordRepository _repository;
+- **Automatic Retry**: Mensagens com falha são automaticamente re-processadas
+- **Connection Recovery**: Conexões perdidas são recuperadas automaticamente
+- **Manual ACK**: Mensagens são reconhecidas apenas após processamento bem-sucedido
+- **Error Handling**: Mensagens com falha após todos os retries são rejeitadas
 
-// Buscar registros por ContentId
-var records = await _repository.GetByContentAsync(contentId);
-
-// Salvar um novo registro (geralmente não usado diretamente)
-await _repository.SaveAsync(stateChangeRecord);
-```
-
-## Interface Simplificada
-
-### IAuditService
-
-```csharp
-public interface IAuditService
-{
-    // Processa mensagens recebidas da queue
-    Task ProcessWorkflowStateChangedEventAsync(WorkflowStateChangedEvent stateChangedEvent, CancellationToken cancellationToken = default);
-    
-    // Consulta histórico por ContentId
-    Task<IEnumerable<StateChangeRecord>> GetStateChangeHistoryAsync(Guid contentId);
-}
-```
-
-### IStateChangeRecordRepository
-
-```csharp
-public interface IStateChangeRecordRepository
-{
-    // Consulta registros por ContentId
-    Task<IEnumerable<StateChangeRecord>> GetByContentAsync(Guid contentId);
-    
-    // Salva um registro de mudança de estado
-    Task SaveAsync(StateChangeRecord stateChangeRecord);
-}
-```
-
-### Configuração Interna
-
-- **Capacidade da Queue**: 1000 mensagens (valor fixo otimizado)
-- **Consumer Service**: Sempre ativo (sem opção de desativar)
-- **Channel Mode**: Bounded com Wait (garante que mensagens não sejam perdidas)
-
-## Estrutura da Base de Dados
-
-### Tabela: Piranha_StateChangeRecords
-
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| Id | uniqueidentifier | Chave primária |
-| WorkflowInstanceId | uniqueidentifier | ID da instância do workflow |
-| ContentId | uniqueidentifier | ID do conteúdo |
-| ContentType | nvarchar(50) | Tipo de conteúdo (Page, Post, etc.) |
-| FromState | nvarchar(100) | Estado anterior |
-| ToState | nvarchar(100) | Novo estado |
-| UserId | nvarchar(450) | ID do usuário |
-| Username | nvarchar(256) | Nome do usuário |
-| Timestamp | datetime2 | Data/hora da mudança |
-| Comments | nvarchar(1000) | Comentários opcionais |
-| TransitionRuleId | uniqueidentifier | ID da regra de transição (opcional) |
-| Metadata | nvarchar(max) | Metadados em JSON |
-| Success | bit | Se a ação foi bem-sucedida |
-| ErrorMessage | nvarchar(2000) | Mensagem de erro (se falhou) |
-
-### Índices Essenciais
-
-- `ContentId, Timestamp` (para consultas de histórico)
-- `ContentId` (consulta principal)
-- `Timestamp` (para ordenação)
-
-## Logs e Monitoramento
-
-O módulo produz logs estruturados para:
-
-- Início/parada do serviço de consumo
-- Processamento de mensagens
-- Erros de deserialização
-- Salvamento de registros
-
-Exemplo de configuração de logging:
+## Logs
 
 ```json
 {
@@ -158,116 +130,81 @@ Exemplo de configuração de logging:
 }
 ```
 
-## Características Técnicas
+## Docker Setup
 
-### Message Queue
-- Utiliza `System.Threading.Channels` para processamento assíncrono
-- Capacidade fixa: 1000 mensagens (otimizada para a maioria dos cenários)
-- Resiliente: continua processando mesmo se uma mensagem falhar
-- Thread-safe para consumo
-
-### Serialização
-- JSON com `System.Text.Json`
-- Case-insensitive para flexibilidade
-- Tratamento robusto de erros de deserialização
-
-### Performance
-- Índices otimizados para consultas por ContentId
-- Processamento assíncrono de mensagens
-- Transformação eficiente entre modelos
-
-## Como Enviar Mensagens para o Audit
-
-Como este módulo é apenas um consumidor, outros componentes do sistema devem enviar mensagens para ele. Exemplo de como outro serviço pode enviar uma mensagem:
-
-```csharp
-// Em outro serviço que publique mensagens
-public class WorkflowService
-{
-    private readonly Channel<string> _auditMessageQueue;
-
-    public async Task ChangeStateAsync(/* parâmetros */)
-    {
-        // Lógica de mudança de estado...
-
-        // Criar evento de auditoria
-        var auditEvent = new WorkflowStateChangedEvent
-        {
-            WorkflowInstanceId = workflowInstanceId,
-            ContentId = contentId,
-            ContentType = "Page",
-            FromState = "Draft",
-            ToState = "Published",
-            UserId = userId,
-            Username = username,
-            Timestamp = DateTime.UtcNow,
-            Success = true
-        };
-
-        // Serializar e enviar para a queue do audit
-        var message = JsonSerializer.Serialize(auditEvent);
-        await _auditMessageQueue.Writer.WriteAsync(message);
-    }
-}
+```yaml
+version: '3.8'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: piranha
+      RABBITMQ_DEFAULT_PASS: piranha123
 ```
 
-## Ficheiros Removidos
+## Publicar Mensagens
 
-Os seguintes ficheiros foram removidos ou renomeados por não serem necessários para um módulo apenas de consumo:
+Outros serviços podem publicar mensagens para o audit:
 
-- `IAuditMessagePublisher.cs` → `.bak` (funcionalidade de publicação removida)
-- `AuditCleanupService.cs` → `.bak` (limpeza automática removida)
+```csharp
+var auditEvent = new WorkflowStateChangedEvent
+{
+    EventId = Guid.NewGuid(),
+    ContentId = contentId,
+    ContentType = "Page",
+    FromState = "Draft",
+    ToState = "Published",
+    UserId = userId,
+    Username = username,
+    Timestamp = DateTime.UtcNow,
+    Success = true
+};
 
-## Métodos Removidos
+var message = JsonSerializer.Serialize(auditEvent);
+var body = Encoding.UTF8.GetBytes(message);
 
-### Do IAuditService:
-- `LogStateChangeAsync()` - substituído pelo processamento direto de eventos
-- `CleanupOldRecordsAsync()` - funcionalidade de limpeza removida
-
-### Do IStateChangeRecordRepository:
-- `GetByIdAsync()`
-- `GetByWorkflowInstanceAsync()`
-- `GetByUserAsync()`
-- `GetByDateRangeAsync()`
-- `GetByTransitionAsync()`
-- `DeleteAsync()`
-- `DeleteOlderThanAsync()`
-
-Apenas os métodos essenciais para consumo e consulta por ContentId foram mantidos.
+await channel.BasicPublishAsync(
+    exchange: "piranha.audit",
+    routingKey: "state.changed",
+    body: body);
+```
 
 ## Troubleshooting
 
 ### Problemas Comuns
 
-**1. Mensagens não são processadas**
-- Verificar logs do `AuditMessageConsumerService`
-- Verificar se o serviço está registrado como HostedService
-- Verificar se a aplicação está enviando mensagens para a queue correta
-
-**2. Erros de serialização**
-- Verificar formato JSON das mensagens
-- Verificar compatibilidade de versões dos eventos
-- Ativar logs Debug para ver detalhes
-
-**3. Registros não aparecem**
-- Verificar se as mensagens estão chegando à queue
-- Verificar conectividade com a base de dados
-- Verificar se o ContentId está correto nas consultas
+1. **Falha na conexão RabbitMQ**: Verificar se RabbitMQ está rodando e credenciais estão corretas
+2. **Mensagens não processadas**: Verificar logs do consumer e se a queue tem mensagens
+3. **Erros de serialização**: Verificar formato JSON e ativar logs Debug
+4. **Registros não aparecem**: Verificar se mensagens estão sendo ACK'd e conectividade com BD
 
 ## Resumo das Alterações
 
-Este módulo foi simplificado para ser **exclusivamente um consumidor de mensagens**:
+✅ **Adicionado:**
+- Integração completa com RabbitMQ
+- Configuração flexível via IConfiguration ou Action
+- Connection management com recovery automático
+- Retry logic configurável
+- Manual message acknowledgment
+- SSL/TLS support
 
 ✅ **Mantido:**
-- Consumo de mensagens da queue
+- Consumo de mensagens (agora do RabbitMQ)
 - Processamento de `WorkflowStateChangedEvent`
 - Salvamento na base de dados
 - Consulta de histórico por ContentId
 
 ❌ **Removido:**
+- Sistema de Channel interno
 - Publicação de mensagens
 - Funcionalidades de limpeza automática
-- Métodos de consulta complexos
-- Múltiplas interfaces desnecessárias
 
-O resultado é um módulo mais leve, focado e fácil de manter que cumpre apenas o objetivo de receber mudanças de estado e guardá-las na base de dados.
+## Dependências
+
+- **RabbitMQ.Client**: 6.8.1
+- **Microsoft.Extensions.Hosting.Abstractions**: 9.0.0
+
+O resultado é um módulo robusto e production-ready que integra com RabbitMQ para consumir eventos de auditoria de forma confiável e eficiente.
