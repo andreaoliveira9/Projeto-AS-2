@@ -77,8 +77,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Piranha.EditorialWorkflow",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Piranha.Audit", "core\Piranha.Audit\Piranha.Audit.csproj", "{7DBBD7D0-AA03-4FC1-97D9-FA4B759E5F23}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Piranha.Data.EF.Audit", "data\Piranha.Data.EF.Audit\Piranha.Data.EF.Audit.csproj", "{E2B296C9-AAF6-469E-8AEC-92C3DAD4992B}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Piranha.Data.EF.EditorialWorkflowAndAudit", "data\Piranha.Data.EF.EditorialWorkflowAndAudit\Piranha.Data.EF.EditorialWorkflowAndAudit.csproj", "{417BFB6E-A38A-4BDF-9902-ADA7F0B544EC}"
 EndProject
 Global

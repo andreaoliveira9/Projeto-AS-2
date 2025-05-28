@@ -20,7 +20,6 @@
     <ProjectReference Include="..\..\data\Piranha.Data.EF.MySql\Piranha.Data.EF.MySql.csproj" />
     <ProjectReference Include="..\..\data\Piranha.Data.EF.PostgreSql\Piranha.Data.EF.PostgreSql.csproj" />
     <ProjectReference Include="..\..\identity\Piranha.AspNetCore.Identity.SQLite\Piranha.AspNetCore.Identity.SQLite.csproj" />
-    <ProjectReference Include="..\..\data\Piranha.Data.EF.EditorialWorkflow\Piranha.Data.EF.EditorialWorkflow.csproj" />
   </ItemGroup>
 
 </Project>
