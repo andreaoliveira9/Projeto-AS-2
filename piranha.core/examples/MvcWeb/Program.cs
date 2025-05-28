@@ -7,8 +7,42 @@ using Piranha.EditorialWorkflow.Extensions;
 using Piranha.Audit.Extensions;
 using Piranha.Manager.Editor;
 using Piranha.Data.EF.EditorialWorkflowAndAudit;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure OpenTelemetry
+var serviceName = "MvcWeb";
+var serviceVersion = "1.0.0";
+
+// Add services to the container
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: serviceName,
+            serviceVersion: serviceVersion))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddSqlClientInstrumentation()
+        .AddSource(serviceName)
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317");
+        }))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddProcessInstrumentation()
+        .AddMeter(serviceName)
+        .AddPrometheusExporter());
+
+// Configure logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 builder.AddPiranha(options =>
 {
@@ -29,9 +63,9 @@ builder.AddPiranha(options =>
 
     // Audit 
     options.UseAudit(rabbitMQOptions => {
-        rabbitMQOptions.HostName = "localhost";
-        rabbitMQOptions.UserName = "user";
-        rabbitMQOptions.Password = "password";
+        rabbitMQOptions.HostName = builder.Configuration["RabbitMQ:HostName"] ?? "rabbitmq";
+        rabbitMQOptions.UserName = builder.Configuration["RabbitMQ:UserName"] ?? "admin";
+        rabbitMQOptions.Password = builder.Configuration["RabbitMQ:Password"] ?? "admin";
         rabbitMQOptions.QueueName = "audit.WorkflowStateChanged";
         rabbitMQOptions.MaxRetryAttempts = 5;
     });
@@ -76,6 +110,9 @@ if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
+
+// Configure the HTTP request pipeline
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
 app.UsePiranha(options =>
 {
