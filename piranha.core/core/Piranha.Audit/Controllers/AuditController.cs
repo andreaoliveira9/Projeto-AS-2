@@ -118,7 +118,7 @@ public class AuditController : ControllerBase
                 TotalChanges = recordsList.Count,
                 LastChange = recordsList.FirstOrDefault()?.Timestamp,
                 LastChangedBy = recordsList.FirstOrDefault()?.Username,
-                CurrentState = recordsList.FirstOrDefault()?.ToState,
+                CurrentState = recordsList.LastOrDefault()?.ToState,
                 SuccessfulChanges = recordsList.Count(r => r.Success),
                 FailedChanges = recordsList.Count(r => !r.Success)
             };
