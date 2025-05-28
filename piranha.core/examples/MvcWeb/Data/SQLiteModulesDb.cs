@@ -6,15 +6,14 @@ using Piranha.Data.EditorialWorkflowAndAudit;
 
 namespace MvcWeb.Data;
 
-public class SQLiteModulesDb : Db<SQLiteModulesDb>, IEditorialWorkflowDb
+public class SQLiteModulesDb : Db<SQLiteModulesDb>, IEditorialWorkflowDb, IAuditDb
 {
     public DbSet<WorkflowDefinition> WorkflowDefinitions { get; set; }
     public DbSet<WorkflowState> WorkflowStates { get; set; }
     public DbSet<TransitionRule> TransitionRules { get; set; }
     public DbSet<WorkflowInstance> WorkflowInstances { get; set; }
     public DbSet<WorkflowContentExtension> WorkflowContentExtensions { get; set; }
-
-    public DbSet<StateChangeRecord> StateChangeRecord { get; set; }
+    public DbSet<StateChangeRecord> StateChangeRecords { get; set; }
 
     public SQLiteModulesDb(DbContextOptions<SQLiteModulesDb> options) : base(options) { }
 

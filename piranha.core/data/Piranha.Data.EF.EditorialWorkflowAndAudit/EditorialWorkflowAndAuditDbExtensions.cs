@@ -46,6 +46,14 @@ public interface IEditorialWorkflowDb
     DbSet<WorkflowContentExtension> WorkflowContentExtensions { get; set; }
 }
 
+public interface IAuditDb
+{
+    /// <summary>
+    /// Gets/sets the state change records set.
+    /// </summary>
+    DbSet<StateChangeRecord> StateChangeRecords { get; set; }
+}
+
 /// <summary>
 /// Extensions for configuring Editorial Workflow tables in an existing DbContext.
 /// </summary>
@@ -168,7 +176,7 @@ public static class EditorialWorkflowAndAuditDbExtensions
             .WithMany()
             .HasForeignKey(e => e.CurrentWorkflowInstanceId)
             .OnDelete(DeleteBehavior.SetNull);
-        
+
         // Configure table name with prefix
         modelBuilder.Entity<StateChangeRecord>().ToTable("Piranha_StateChangeRecords");
 
@@ -188,7 +196,7 @@ public static class EditorialWorkflowAndAuditDbExtensions
         stateChangeRecord.Property(s => s.Metadata).HasColumnType("TEXT");
         stateChangeRecord.Property(s => s.Success).IsRequired().HasDefaultValue(true);
         stateChangeRecord.Property(s => s.ErrorMessage).HasMaxLength(2000);
-        
+
         // Indexes for better query performance
         stateChangeRecord.HasIndex(s => s.WorkflowInstanceId);
         stateChangeRecord.HasIndex(s => s.ContentId);
