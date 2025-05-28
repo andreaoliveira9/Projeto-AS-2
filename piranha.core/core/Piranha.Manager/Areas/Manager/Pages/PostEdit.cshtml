@@ -194,65 +194,87 @@
         <div class="card" :class="{ 'd-none': selectedRegion.uid != 'uid-audit' }">
             <div class="card-body">
                 <div id="audit-history-container">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3>
-                            <i class="fas fa-history"></i> @Localizer.General["Audit History"]
+                    <!-- Script para inicialização -->
+                    <script>
+                        // Garante que o erro não seja exibido inicialmente
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var errorEl = document.getElementById('audit-error');
+                            if (errorEl) errorEl.style.display = 'none';
+                        });
+                    </script>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h3 class="mb-0">
+                            <i class="fas fa-history text-primary"></i> @Localizer.General["Audit History"]
                         </h3>
-                        <button id="audit-refresh-btn" class="btn btn-outline-primary btn-sm" onclick="loadAuditData()">
-                            <i id="audit-refresh-icon" class="fas fa-sync-alt"></i>
+                        <button id="audit-refresh-btn" class="btn btn-primary btn-sm" onclick="loadAuditData()">
+                            <i id="audit-refresh-icon" class="fas fa-sync-alt mr-1"></i>
                             @Localizer.General["Refresh"]
                         </button>
                     </div>
 
                     <!-- Loading State -->
-                    <div id="audit-loading" class="text-center py-4" style="display: none;">
-                        <div class="spinner-border text-primary" role="status">
+                    <div id="audit-loading" class="text-center py-5" style="display: none;">
+                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
                             <span class="sr-only">Loading...</span>
                         </div>
-                        <p class="mt-2">Loading audit history...</p>
+                        <p class="lead text-muted">Loading audit history...</p>
                     </div>
 
                     <!-- Error State -->
-                    <div id="audit-error" class="alert alert-danger" style="display: none;">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Error:</strong> <span id="audit-error-message"></span>
+                    <div id="audit-error" class="alert alert-danger d-flex align-items-center" style="display: none !important;">
+                        <i class="fas fa-exclamation-triangle fa-lg mr-3"></i>
+                        <div>
+                            <strong>Error:</strong> <span id="audit-error-message"></span>
+                            <button class="btn btn-sm btn-outline-danger ml-3" onclick="loadAuditData()">Try Again</button>
+                        </div>
                     </div>
 
                     <!-- Summary Card -->
-                    <div id="audit-summary" class="card mb-4" style="display: none;">
-                        <div class="card-header">
-                            <h5 class="mb-0">
-                                <i class="fas fa-chart-line"></i> @Localizer.General["Summary"]
+                    <div id="audit-summary" class="card mb-4 border-0 shadow-sm" style="display: none;">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0 d-flex align-items-center">
+                                <i class="fas fa-chart-line text-primary mr-2"></i> @Localizer.General["Summary"]
                             </h5>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-6">
-                                    <div class="d-flex justify-content-between">
-                                        <span><strong>Total Changes:</strong></span>
-                                        <span id="audit-total-changes" class="badge badge-primary">0</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mt-2">
-                                        <span><strong>Successful:</strong></span>
-                                        <span id="audit-successful-changes" class="badge badge-success">0</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mt-2">
-                                        <span><strong>Failed:</strong></span>
-                                        <span id="audit-failed-changes" class="badge badge-danger">0</span>
+                                <div class="col-md-6 mb-3 mb-md-0">
+                                    <div class="card h-100 bg-light border-0">
+                                        <div class="card-body">
+                                            <h6 class="text-muted text-uppercase mb-3 small"><i class="fas fa-list-alt mr-1"></i> Changes</h6>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span>Total</span>
+                                                <span id="audit-total-changes" class="badge badge-primary badge-pill px-3 py-2">0</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span>Successful</span>
+                                                <span id="audit-successful-changes" class="badge badge-success badge-pill px-3 py-2">0</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span>Failed</span>
+                                                <span id="audit-failed-changes" class="badge badge-danger badge-pill px-3 py-2">0</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="d-flex justify-content-between">
-                                        <span><strong>Current State:</strong></span>
-                                        <span id="audit-current-state" class="badge badge-info">N/A</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mt-2">
-                                        <span><strong>Last Changed By:</strong></span>
-                                        <span id="audit-last-user">N/A</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mt-2">
-                                        <span><strong>Last Change:</strong></span>
-                                        <span id="audit-last-change">N/A</span>
+                                    <div class="card h-100 bg-light border-0">
+                                        <div class="card-body">
+                                            <h6 class="text-muted text-uppercase mb-3 small"><i class="fas fa-info-circle mr-1"></i> Status</h6>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span>Current State</span>
+                                                <span id="audit-current-state" class="badge badge-info badge-pill px-3 py-2">N/A</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span>Last Changed By</span>
+                                                <span id="audit-last-user" class="font-weight-medium">N/A</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span>Last Change</span>
+                                                <span id="audit-last-change" class="font-weight-medium">N/A</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -260,19 +282,122 @@
                     </div>
 
                     <!-- No Data State -->
-                    <div id="audit-no-data" class="card" style="display: none;">
+                    <div id="audit-no-data" class="card border-0 shadow-sm" style="display: none;">
                         <div class="card-body text-center py-5">
-                            <i class="fas fa-history fa-3x text-muted mb-3"></i>
-                            <h5 class="text-muted">No Audit History</h5>
-                            <p class="text-muted">No state changes have been recorded for this content yet.</p>
+                            <i class="fas fa-history fa-4x text-muted mb-3 opacity-50"></i>
+                            <h4 class="text-muted">No Audit History Available</h4>
+                            <p class="text-muted mb-4">No state changes have been recorded for this content yet.</p>
+                            <button class="btn btn-outline-secondary" onclick="loadAuditData()">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
                         </div>
                     </div>
 
                     <!-- History Timeline -->
-                    <div id="audit-timeline" class="audit-timeline" style="display: none;">
+                    <div id="audit-timeline" class="audit-timeline mt-4" style="display: none;">
                         <!-- Timeline items will be inserted here by JavaScript -->
                     </div>
                 </div>
+
+                <style>
+                    .audit-timeline {
+                        position: relative;
+                        padding-left: 40px;
+                        margin-bottom: 2rem;
+                    }
+
+                    .timeline-item {
+                        position: relative;
+                        margin-bottom: 2.5rem;
+                    }
+
+                    .timeline-item:not(:last-child)::after {
+                        content: '';
+                        position: absolute;
+                        left: -21px;
+                        top: 45px;
+                        bottom: -2.5rem;
+                        width: 3px;
+                        background-color: #e9ecef;
+                    }
+
+                    .timeline-marker {
+                        position: absolute;
+                        left: -40px;
+                        top: 12px;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 14px;
+                        color: white;
+                        background-color: #28a745;
+                        border: 3px solid #fff;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+                        z-index: 1;
+                    }
+
+                    .timeline-item-error .timeline-marker {
+                        background-color: #dc3545;
+                    }
+
+                    .timeline-content {
+                        flex: 1;
+                    }
+
+                    .timeline-content .card {
+                        border: 0;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+                        transition: box-shadow 0.3s ease;
+                    }
+
+                    .timeline-content .card:hover {
+                        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                    }
+
+                    .details-toggle {
+                        cursor: pointer;
+                        border: none;
+                        background: none;
+                        color: #007bff;
+                        padding: 0.25rem 0.5rem;
+                        font-size: 0.875rem;
+                        border-radius: 0.2rem;
+                        transition: all 0.2s ease;
+                    }
+
+                    .details-toggle:hover {
+                        background-color: rgba(0, 123, 255, 0.1);
+                    }
+
+                    .details-content {
+                        display: none;
+                        margin-top: 1rem;
+                        padding-top: 1rem;
+                        border-top: 1px solid #dee2e6;
+                        animation: fadeIn 0.3s ease;
+                    }
+
+                    @* Escape the @ symbol in keyframes with @@ *@
+                    @@keyframes fadeIn {
+                        from { opacity: 0; transform: translateY(-10px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+
+                    .font-weight-medium {
+                        font-weight: 500;
+                    }
+
+                    .badge-pill {
+                        font-weight: 500;
+                    }
+
+                    .opacity-50 {
+                        opacity: 0.5;
+                    }
+                </style>
 
                 <script>
                     // Only define functions if not already defined (to avoid conflicts)
@@ -313,9 +438,17 @@
                             hideAuditLoading();
                             const errorMsg = document.getElementById('audit-error-message');
                             const errorEl = document.getElementById('audit-error');
+                            const summaryEl = document.getElementById('audit-summary');
+                            const timelineEl = document.getElementById('audit-timeline');
+                            const noDataEl = document.getElementById('audit-no-data');
                             
                             if (errorMsg) errorMsg.textContent = message;
-                            if (errorEl) errorEl.style.display = 'block';
+                            if (errorEl) errorEl.style.display = 'flex';
+                            
+                            // Esconder os outros elementos quando há erro
+                            if (summaryEl) summaryEl.style.display = 'none';
+                            if (timelineEl) timelineEl.style.display = 'none';
+                            if (noDataEl) noDataEl.style.display = 'none';
                         }
 
                         function showAuditNoData() {
@@ -384,7 +517,7 @@
                                 
                                 timelineItem.innerHTML = [
                                     '<div class="timeline-marker">',
-                                        '<i class="fas ' + (record.success ? 'fa-check' : 'fa-times') + '" title="' + (record.success ? 'Success' : 'Failed') + '"></i>',
+                                        '',
                                     '</div>',
                                     '<div class="timeline-content">',
                                         '<div class="card">',
@@ -474,7 +607,22 @@
                                 : null;
                             
                             if (!contentId) {
-                                showAuditError('Content ID not found');
+                                // Se estamos no modo de criação, não devemos mostrar erro
+                                if (window.piranha && window.piranha.postedit && window.piranha.postedit.state === 'new') {
+                                    // Não mostra erro se for um post novo
+                                    showAuditNoData();
+                                    return;
+                                }
+                                
+                                // Tenta novamente após um breve atraso
+                                setTimeout(function() {
+                                    const retryContentId = window.piranha?.postedit?.model?.id || window.piranha?.pageedit?.model?.id || null;
+                                    if (!retryContentId) {
+                                        showAuditNoData();
+                                    } else {
+                                        loadAuditData();
+                                    }
+                                }, 2000);
                                 return;
                             }
 
@@ -482,6 +630,10 @@
                             showAuditLoading();
 
                             try {
+                                // Limpa dados anteriores para evitar que dados antigos apareçam
+                                auditHistory = [];
+                                auditSummary = null;
+                                
                                 // Load history and summary in parallel
                                 const historyUrl = `${window.piranha.baseUrl}api/audit/content/${contentId}/history`;
                                 const summaryUrl = `${window.piranha.baseUrl}api/audit/content/${contentId}/summary`;
@@ -537,60 +689,29 @@
                         // Auto-load when page is ready
                         if (document.readyState === 'loading') {
                             document.addEventListener('DOMContentLoaded', function() {
-                                setTimeout(loadAuditData, 1000);
+                                // Esconde a mensagem de erro no início
+                                const errorEl = document.getElementById('audit-error');
+                                if (errorEl) errorEl.style.display = 'none';
+                                
+                                // Inicialmente mostra o estado de carregamento
+                                const loadingEl = document.getElementById('audit-loading');
+                                if (loadingEl) loadingEl.style.display = 'block';
+                                
+                                setTimeout(loadAuditData, 3000);
                             });
                         } else {
-                            setTimeout(loadAuditData, 1000);
+                            // Esconde a mensagem de erro no início
+                            const errorEl = document.getElementById('audit-error');
+                            if (errorEl) errorEl.style.display = 'none';
+                            
+                            // Inicialmente mostra o estado de carregamento
+                            const loadingEl = document.getElementById('audit-loading');
+                            if (loadingEl) loadingEl.style.display = 'block';
+                            
+                            setTimeout(loadAuditData, 3000);
                         }
                     }
                 </script>
-
-                <style>
-                    .audit-timeline {
-                        position: relative;
-                        padding-left: 30px;
-                    }
-
-                    .timeline-item {
-                        position: relative;
-                        margin-bottom: 2rem;
-                    }
-
-                    .timeline-item:not(:last-child)::after {
-                        content: '';
-                        position: absolute;
-                        left: -19px;
-                        top: 40px;
-                        bottom: -2rem;
-                        width: 2px;
-                        background-color: #e9ecef;
-                    }
-
-                    .timeline-marker {
-                        position: absolute;
-                        left: -30px;
-                        top: 10px;
-                        width: 24px;
-                        height: 24px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 12px;
-                        color: white;
-                        background-color: #28a745;
-                        border: 2px solid #fff;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    }
-
-                    .timeline-item-error .timeline-marker {
-                        background-color: #dc3545;
-                    }
-
-                    .timeline-content {
-                        flex: 1;
-                    }
-                </style>
             </div>
         </div>
     </div>
