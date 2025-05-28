@@ -6,9 +6,30 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 65
+    spike_limit_percentage: 20
+
+  batch:
+
+  transform:
+    trace_statements:
+      - context: span
+        statements:
+          # Delete sensitive fields
+          - delete_key(attributes, "password")
+          - delete_key(attributes, "credit_card")
+          - delete_key(attributes, "card.number")
+          # Redact PII
+          - set(attributes["user.email"], "[REDACTED]") where attributes["user.email"] != nil
+          - set(attributes["user.name"], "[REDACTED]") where attributes["user.name"] != nil
+          - set(attributes["user.id"], "[ID]") where attributes["user.id"] != nil
+
 exporters:
   otlp/jaeger:
-    endpoint: jaeger:4317
+    endpoint: mvcweb-jaeger:4317
     tls:
       insecure: true
   
@@ -16,13 +37,9 @@ exporters:
     endpoint: "0.0.0.0:8889"
     const_labels:
       environment: development
-  
+
   debug:
     verbosity: detailed
-
-processors:
-  batch:
-    timeout: 10s
 
 extensions:
   health_check:
@@ -37,11 +54,11 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, transform, batch]
       exporters: [otlp/jaeger, debug]
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [prometheus, debug]
     logs:
       receivers: [otlp]

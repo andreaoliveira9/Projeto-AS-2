@@ -140,7 +140,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "process_cpu_usage{job=\"mvcweb\"} * 100",
+          "expr": "process_cpu_count{job=\"mvcweb\"} * 100",
           "refId": "A"
         }
       ],
