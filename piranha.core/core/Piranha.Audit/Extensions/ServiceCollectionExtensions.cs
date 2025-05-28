@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Piranha;
 using Piranha.Audit.Configuration;
 using Piranha.Audit.Services;
+using Piranha.Audit.Controllers;
 
 namespace Piranha.Audit.Extensions;
 
@@ -44,6 +45,10 @@ public static class ServiceCollectionExtensions
 
         // Register background service for consuming audit messages from RabbitMQ
         services.AddHostedService<AuditMessageConsumerService>();
+
+        services.AddControllers()
+            .AddApplicationPart(typeof(AuditController).Assembly)
+            .AddControllersAsServices();
 
         return services;
     }
