@@ -8,9 +8,12 @@
  *
  */
 
+using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Piranha.AspNetCore.Telemetry;
 using Piranha.Models;
+using Piranha.Telemetry;
 
 namespace Piranha.WebApi;
 
@@ -42,6 +45,10 @@ public class PageApiController : Controller
     [Route("{id:Guid}")]
     public virtual async Task<IActionResult> GetById(Guid id)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.ApiOperation, "GetPageById");
+        activity?.EnrichWithHttpContext(HttpContext);
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentId, id.ToString());
+        activity?.SetTag("operation.name", AspNetCoreTracingExtensions.CreateOperationName("PageAPI", "GetById", "Page"));
         if (!Module.AllowAnonymousAccess)
         {
             if (!(await _auth.AuthorizeAsync(User, Permissions.Pages)).Succeeded)
@@ -49,7 +56,17 @@ public class PageApiController : Controller
                 return Unauthorized();
             }
         }
-        return Json(await _api.Pages.GetByIdAsync<PageBase>(id));
+        var page = await _api.Pages.GetByIdAsync<PageBase>(id);
+        if (page != null)
+        {
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentType, page.TypeId);
+            activity?.SetOperationStatus(true, "Page retrieved successfully");
+        }
+        else
+        {
+            activity?.SetOperationStatus(false, "Page not found");
+        }
+        return Json(page);
     }
 
     /// <summary>
@@ -62,6 +79,10 @@ public class PageApiController : Controller
     [Route("{slug}")]
     public virtual async Task<IActionResult> GetBySlug(string slug)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.ApiOperation, "GetPageBySlug");
+        activity?.EnrichWithHttpContext(HttpContext);
+        activity?.SetTag("page.slug", slug);
+        activity?.SetTag("operation.name", AspNetCoreTracingExtensions.CreateOperationName("PageAPI", "GetBySlug", "Page"));
         if (!Module.AllowAnonymousAccess)
         {
             if (!(await _auth.AuthorizeAsync(User, Permissions.Pages)).Succeeded)
@@ -69,7 +90,18 @@ public class PageApiController : Controller
                 return Unauthorized();
             }
         }
-        return Json(await _api.Pages.GetBySlugAsync<PageBase>(slug));
+        var page = await _api.Pages.GetBySlugAsync<PageBase>(slug);
+        if (page != null)
+        {
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentId, page.Id.ToString());
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentType, page.TypeId);
+            activity?.SetOperationStatus(true, "Page retrieved successfully");
+        }
+        else
+        {
+            activity?.SetOperationStatus(false, "Page not found");
+        }
+        return Json(page);
     }
 
     /// <summary>

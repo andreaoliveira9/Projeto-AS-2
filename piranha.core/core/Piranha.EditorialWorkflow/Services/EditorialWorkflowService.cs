@@ -1,3 +1,4 @@
+#nullable enable
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -5,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Piranha.AspNetCore.Identity.Data;
 using Piranha.EditorialWorkflow.Models;
 using Piranha.EditorialWorkflow.Repositories;
+using Piranha.Telemetry;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace Piranha.EditorialWorkflow.Services;
 
@@ -44,11 +48,17 @@ public class EditorialWorkflowService : IEditorialWorkflowService
 
     public async Task<WorkflowDefinition> CreateWorkflowDefinitionAsync(WorkflowDefinition definition)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.WorkflowOperation, "CreateWorkflowDefinition");
+        activity.DisplayName = $"WorkflowService: Create Definition '{definition?.Name}'";
+        
         _logger.LogInformation("CreateWorkflowDefinitionAsync: Starting creation of workflow definition. Name: {Name}, IsActive: {IsActive}", 
             definition?.Name, definition?.IsActive);
 
         try
         {
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "workflow.create");
+            activity?.SetTag("workflow.name", definition?.Name);
+            activity?.SetTag("workflow.is_active", definition?.IsActive);
             if (definition == null)
             {
                 _logger.LogError("CreateWorkflowDefinitionAsync: Definition is null");
@@ -117,22 +127,32 @@ public class EditorialWorkflowService : IEditorialWorkflowService
                 _logger.LogWarning("CreateWorkflowDefinitionAsync: Verification failed - workflow not found after save. ID: {Id}", definition.Id);
             }
 
+            activity?.SetTag("workflow.id", definition.Id.ToString());
+            activity?.SetOperationStatus(true, "Workflow definition created successfully");
+            
             return definition;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "CreateWorkflowDefinitionAsync: Error creating workflow definition. Name: {Name}", definition?.Name);
+            activity?.RecordException(ex);
             throw;
         }
     }
 
     public async Task<WorkflowDefinition> UpdateWorkflowDefinitionAsync(WorkflowDefinition definition)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.WorkflowOperation, "UpdateWorkflowDefinition");
+        
         _logger.LogInformation("UpdateWorkflowDefinitionAsync: Starting update of workflow definition. Name: {Name}, IsActive: {IsActive}", 
             definition?.Name, definition?.IsActive);
 
         try
         {
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "workflow.update");
+            activity?.SetTag("workflow.id", definition?.Id.ToString());
+            activity?.SetTag("workflow.name", definition?.Name);
+            activity?.SetTag("workflow.is_active", definition?.IsActive);
             // If setting this workflow as active, ensure no other workflow is active
             if (definition.IsActive)
             {
@@ -164,11 +184,14 @@ public class EditorialWorkflowService : IEditorialWorkflowService
             _logger.LogInformation("UpdateWorkflowDefinitionAsync: Successfully updated workflow definition. ID: {Id}, Name: {Name}, IsActive: {IsActive}", 
                 definition.Id, definition.Name, definition.IsActive);
 
+            activity?.SetOperationStatus(true, "Workflow definition updated successfully");
+            
             return definition;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "UpdateWorkflowDefinitionAsync: Error updating workflow definition. Name: {Name}", definition?.Name);
+            activity?.RecordException(ex);
             throw;
         }
     }
@@ -314,8 +337,99 @@ public class EditorialWorkflowService : IEditorialWorkflowService
 
     public async Task<WorkflowState> CreateWorkflowStateAsync(WorkflowState state)
     {
-        await _workflowStateRepository.Save(state);
-        return state;
+        _logger.LogInformation("CreateWorkflowStateAsync: Starting creation of workflow state. StateId: {StateId}, WorkflowDefinitionId: {WorkflowDefinitionId}", 
+            state?.StateId, state?.WorkflowDefinitionId);
+
+        try
+        {
+            // Validate that the workflow definition exists
+            var workflowDefinition = await _workflowDefinitionRepository.GetById(state.WorkflowDefinitionId);
+            if (workflowDefinition == null)
+            {
+                _logger.LogError("CreateWorkflowStateAsync: Workflow definition not found with ID: {WorkflowDefinitionId}", 
+                    state.WorkflowDefinitionId);
+                throw new InvalidOperationException($"Workflow definition with ID {state.WorkflowDefinitionId} does not exist. Please create the workflow definition first.");
+            }
+
+            _logger.LogInformation("CreateWorkflowStateAsync: Found workflow definition - Name: {Name}, IsActive: {IsActive}", 
+                workflowDefinition.Name, workflowDefinition.IsActive);
+
+            // Check if a state with the same StateId already exists in this workflow
+            var existingStates = await _workflowStateRepository.GetByWorkflow(state.WorkflowDefinitionId);
+            var duplicateState = existingStates?.FirstOrDefault(s => s.StateId == state.StateId);
+            if (duplicateState != null)
+            {
+                _logger.LogError("CreateWorkflowStateAsync: State with StateId '{StateId}' already exists in workflow {WorkflowDefinitionId}", 
+                    state.StateId, state.WorkflowDefinitionId);
+                throw new InvalidOperationException($"A state with StateId '{state.StateId}' already exists in this workflow.");
+            }
+
+            // Set creation timestamp
+            state.Created = DateTime.UtcNow;
+
+            await _workflowStateRepository.Save(state);
+            
+            _logger.LogInformation("CreateWorkflowStateAsync: Successfully created workflow state. ID: {Id}, StateId: {StateId}", 
+                state.Id, state.StateId);
+            
+            return state;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CreateWorkflowStateAsync: Error creating workflow state. StateId: {StateId}, WorkflowDefinitionId: {WorkflowDefinitionId}", 
+                state?.StateId, state?.WorkflowDefinitionId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Creates a default workflow definition if none exists, then creates the workflow state
+    /// </summary>
+    public async Task<WorkflowState> CreateWorkflowStateWithValidationAsync(WorkflowState state)
+    {
+        _logger.LogInformation("CreateWorkflowStateWithValidationAsync: Starting creation with auto-workflow creation if needed. StateId: {StateId}, WorkflowDefinitionId: {WorkflowDefinitionId}", 
+            state?.StateId, state?.WorkflowDefinitionId);
+
+        try
+        {
+            // Check if workflow definition exists
+            var workflowDefinition = await _workflowDefinitionRepository.GetById(state.WorkflowDefinitionId);
+            if (workflowDefinition == null)
+            {
+                _logger.LogWarning("CreateWorkflowStateWithValidationAsync: Workflow definition {WorkflowDefinitionId} not found, creating default workflow", 
+                    state.WorkflowDefinitionId);
+                
+                // Create a default workflow definition
+                var defaultWorkflow = new WorkflowDefinition
+                {
+                    Id = state.WorkflowDefinitionId,
+                    Name = "Default Editorial Workflow",
+                    Description = "Auto-created workflow for editorial process",
+                    IsActive = true,
+                    Version = 1,
+                    Created = DateTime.UtcNow,
+                    LastModified = DateTime.UtcNow,
+                    CreatedBy = "System",
+                    LastModifiedBy = "System",
+                    States = new List<WorkflowState>(),
+                    Instances = new List<WorkflowInstance>()
+                };
+
+                await _workflowDefinitionRepository.Save(defaultWorkflow);
+                
+                _logger.LogInformation("CreateWorkflowStateWithValidationAsync: Created default workflow definition with ID: {WorkflowDefinitionId}", 
+                    state.WorkflowDefinitionId);
+            }
+
+            // Now create the state using the existing method
+            return await CreateWorkflowStateAsync(state);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CreateWorkflowStateWithValidationAsync: Error creating workflow state with validation. StateId: {StateId}, WorkflowDefinitionId: {WorkflowDefinitionId}", 
+                state?.StateId, state?.WorkflowDefinitionId);
+            throw;
+        }
     }
 
     public async Task<WorkflowState> UpdateWorkflowStateAsync(WorkflowState state)
@@ -338,6 +452,11 @@ public class EditorialWorkflowService : IEditorialWorkflowService
 
     public async Task<WorkflowInstance> CreateWorkflowInstanceAsync(WorkflowInstance instance)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.WorkflowOperation, "CreateWorkflowInstance");
+        activity.DisplayName = "WorkflowService: Create Instance";
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "workflow.instance.create");
+        activity?.SetTag("workflow.definition_id", instance?.WorkflowDefinitionId.ToString());
+        
         var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
         var roles = await _userManager.GetRolesAsync(user);
 
@@ -350,6 +469,20 @@ public class EditorialWorkflowService : IEditorialWorkflowService
             throw new Exception("Estado inicial não encontrado para o workflow.");
         instance.CurrentStateId = initialState.Id;
         await _workflowInstanceRepository.Save(instance);
+        
+        // Record metrics for instance creation
+        var tags = new KeyValuePair<string, object?>[] {
+            new("workflow_id", instance.WorkflowDefinitionId.ToString()),
+            new("content_type", "content"), // Default content type
+            new("initial_state", initialState.StateId)
+        };
+        WorkflowMetricsProvider.InstancesCreated.Add(1, tags);
+        
+        activity?.SetTag("workflow.instance.id", instance.Id.ToString());
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.WorkflowState, initialState.StateId);
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.UserId, PiranhaTelemetry.MaskSensitiveData(user?.Id.ToString(), SensitiveDataType.UserId));
+        activity?.SetOperationStatus(true, "Workflow instance created successfully");
+        
         return instance;
     }
 
@@ -361,9 +494,19 @@ public class EditorialWorkflowService : IEditorialWorkflowService
 
     public async Task<bool> TransitionWorkflowAsync(Guid instanceId, string targetStateId)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.WorkflowOperation, "TransitionWorkflow");
+        activity.DisplayName = $"WorkflowService: Transition to {targetStateId}";
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "workflow.transition");
+        activity?.SetTag("workflow.instance_id", instanceId.ToString());
+        activity?.SetTag("workflow.target_state", targetStateId);
+        
+        var stopwatch = Stopwatch.StartNew();
         var instance = await _workflowInstanceRepository.GetById(instanceId);
         if (instance == null)
+        {
+            activity?.SetOperationStatus(false, "Workflow instance not found");
             return false;
+        }
 
         var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
         var roles = await _userManager.GetRolesAsync(user);
@@ -372,21 +515,53 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         var workflow = await _workflowDefinitionRepository.GetWithStates(instance.WorkflowDefinitionId);
         var targetState = workflow.States.FirstOrDefault(s => s.StateId == targetStateId);
         if (targetState == null)
+        {
+            // Record failed transition
+            RecordTransitionMetrics(instance.WorkflowDefinitionId.ToString(), "unknown", targetStateId, 
+                "content", roles?.FirstOrDefault(), false, stopwatch.ElapsedMilliseconds);
             return false;
+        }
+
+        // Get current state for metrics
+        var currentState = workflow.States.FirstOrDefault(s => s.Id == instance.CurrentStateId);
+        var fromStateId = currentState?.StateId ?? "unknown";
 
         // Verifica se existe uma regra de transição válida
         var transitionRule = await _transitionRuleRepository.GetTransition(instance.CurrentStateId, targetState.Id);
         if (transitionRule == null)
+        {
+            RecordTransitionMetrics(instance.WorkflowDefinitionId.ToString(), fromStateId, targetStateId, 
+                "content", roles?.FirstOrDefault(), false, stopwatch.ElapsedMilliseconds);
             return false;
+        }
 
         // Verifica se o usuário tem permissão para fazer a transição
         if (!roles.Any(r => transitionRule.AllowedRoles.Contains(r)))
+        {
+            activity?.SetTag("workflow.transition.denied", "User lacks required role");
+            activity?.SetOperationStatus(false, "User lacks permission for transition");
+            RecordTransitionMetrics(instance.WorkflowDefinitionId.ToString(), fromStateId, targetStateId, 
+                "content", roles?.FirstOrDefault(), false, stopwatch.ElapsedMilliseconds);
             return false;
+        }
 
         // Atualiza o estado
+        var previousStateId = instance.CurrentStateId;
         instance.CurrentStateId = targetState.Id;
         instance.LastModified = DateTime.UtcNow;
         await _workflowInstanceRepository.Save(instance);
+        
+        stopwatch.Stop();
+        
+        // Record successful transition metrics
+        RecordTransitionMetrics(instance.WorkflowDefinitionId.ToString(), fromStateId, targetStateId, 
+            "content", roles?.FirstOrDefault(), true, stopwatch.ElapsedMilliseconds);
+        
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.WorkflowState, targetState.StateId);
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.WorkflowTransition, $"{previousStateId} -> {targetState.Id}");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.UserId, PiranhaTelemetry.MaskSensitiveData(user?.Id.ToString(), SensitiveDataType.UserId));
+        activity?.SetOperationStatus(true, "Workflow transition completed successfully");
+        
         return true;
     }
 
@@ -418,6 +593,9 @@ public class EditorialWorkflowService : IEditorialWorkflowService
 
     public async Task<IEnumerable<WorkflowDefinition>> GetAllWorkflowDefinitionsAsync()
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.WorkflowOperation, "GetAllWorkflowDefinitions");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "workflow.list");
+        
         _logger.LogInformation("GetAllWorkflowDefinitionsAsync: Starting retrieval of all workflow definitions");
 
         try
@@ -440,11 +618,15 @@ public class EditorialWorkflowService : IEditorialWorkflowService
                 _logger.LogInformation("GetAllWorkflowDefinitionsAsync: No workflow definitions found in database");
             }
 
+            activity?.SetTag("workflow.definitions.count", definitionsList.Count);
+            activity?.SetOperationStatus(true, $"Retrieved {definitionsList.Count} workflow definitions");
+            
             return definitionsList;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetAllWorkflowDefinitionsAsync: Error retrieving workflow definitions");
+            activity?.RecordException(ex);
             throw;
         }
     }
@@ -698,6 +880,67 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         {
             _logger.LogError(ex, "GetSystemRolesAsync: Error retrieving system roles");
             throw;
+        }
+    }
+    
+    /// <summary>
+    /// Helper method to record workflow transition metrics
+    /// </summary>
+    private static void RecordTransitionMetrics(string workflowId, string fromState, string toState, 
+        string contentType, string? userRole, bool success, double durationMs)
+    {
+        var tags = new KeyValuePair<string, object?>[]
+        {
+            new("workflow_id", workflowId),
+            new("from_state", fromState),
+            new("to_state", toState),
+            new("content_type", contentType),
+            new("success", success.ToString())
+        };
+
+        if (!string.IsNullOrEmpty(userRole))
+        {
+            var extendedTags = tags.Concat(new[] { new KeyValuePair<string, object?>("user_role", userRole) }).ToArray();
+            tags = extendedTags;
+        }
+
+        // Record transition count
+        WorkflowMetricsProvider.TransitionCount.Add(1, tags);
+
+        // Record failure if applicable
+        if (!success)
+        {
+            WorkflowMetricsProvider.TransitionFailureCount.Add(1, tags);
+        }
+
+        // Record duration
+        WorkflowMetricsProvider.TransitionDuration.Record(durationMs, tags);
+
+        // Record transition by role
+        if (!string.IsNullOrEmpty(userRole))
+        {
+            var roleTags = new KeyValuePair<string, object?>[] {
+                new("role", userRole),
+                new("workflow_id", workflowId)
+            };
+            WorkflowMetricsProvider.TransitionsByRole.Add(1, roleTags);
+        }
+
+        // Check for specific state transitions
+        if (toState.ToLower() == "published" && success)
+        {
+            WorkflowMetricsProvider.ContentPublished.Add(1, new KeyValuePair<string, object?>[] {
+                new("workflow_id", workflowId),
+                new("content_type", contentType)
+            });
+        }
+        else if (toState.ToLower() == "rejected" && success)
+        {
+            WorkflowMetricsProvider.ContentRejected.Add(1, new KeyValuePair<string, object?>[] {
+                new("workflow_id", workflowId),
+                new("content_type", contentType),
+                new("from_state", fromState)
+            });
         }
     }
 } 

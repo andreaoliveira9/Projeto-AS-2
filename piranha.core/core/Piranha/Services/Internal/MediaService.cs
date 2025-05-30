@@ -9,10 +9,12 @@
  */
 
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Text;
 using Piranha.Cache;
 using Piranha.Models;
 using Piranha.Repositories;
+using Piranha.Telemetry;
 
 namespace Piranha.Services;
 
@@ -70,9 +72,18 @@ internal sealed class MediaService : IMediaService
     /// </summary>
     /// <param name="folderId">The optional folder id</param>
     /// <returns>The available media</returns>
-    public Task<IEnumerable<Media>> GetAllByFolderIdAsync(Guid? folderId = null)
+    public async Task<IEnumerable<Media>> GetAllByFolderIdAsync(Guid? folderId = null)
     {
-        return _repo.GetAll(folderId).ContinueWith(t => _getFast(t.Result.ToArray())).Unwrap();
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.MediaOperation, "GetAllByFolderId");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "media.list");
+        activity?.SetTag("media.folder_id", folderId?.ToString());
+        
+        var result = await _repo.GetAll(folderId).ContinueWith(t => _getFast(t.Result.ToArray())).Unwrap();
+        
+        activity?.SetTag("media.count", result.Count());
+        activity?.SetOperationStatus(true, $"Retrieved {result.Count()} media items");
+        
+        return result;
     }
 
     /// <inheritdoc cref="IMediaService.CountFolderItemsAsync"/>

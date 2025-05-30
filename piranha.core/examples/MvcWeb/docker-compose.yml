@@ -103,6 +103,7 @@ services:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
       - "4319:4317"     # OTLP gRPC receiver
+      - "8890:8889"     # Prometheus metrics exporter
     depends_on:
       - jaeger
       - prometheus

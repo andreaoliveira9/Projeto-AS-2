@@ -10,12 +10,19 @@ using Piranha.Data.EF.EditorialWorkflowAndAudit;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Piranha.Telemetry;
+using System.Diagnostics;
+using MvcWeb.Telemetry;
+using Piranha.EditorialWorkflow.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure OpenTelemetry
 var serviceName = "MvcWeb";
 var serviceVersion = "1.0.0";
+
+// Configure Piranha telemetry sources
+var piranhaServiceName = PiranhaTelemetry.ServiceName;
 
 // Add services to the container
 builder.Services.AddOpenTelemetry()
@@ -24,10 +31,62 @@ builder.Services.AddOpenTelemetry()
             serviceName: serviceName,
             serviceVersion: serviceVersion))
     .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddSqlClientInstrumentation()
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            // Enrich spans with additional information
+            options.RecordException = true;
+            options.Filter = (httpContext) =>
+            {
+                // Don't trace health checks or metrics endpoints
+                var path = httpContext.Request.Path.Value;
+                return !path.StartsWith("/health") && !path.StartsWith("/metrics");
+            };
+            options.EnrichWithHttpRequest = (activity, httpRequest) =>
+            {
+                activity.SetTag("http.request.method", httpRequest.Method);
+                activity.SetTag("http.request.content_type", httpRequest.ContentType);
+                
+                // Set more intuitive operation names based on the route
+                var path = httpRequest.Path.Value;
+                if (path.Contains("/api/workflow/"))
+                {
+                    activity.DisplayName = $"WorkflowAPI: {httpRequest.Method} {path}";
+                }
+                else if (path.Contains("/api/page/"))
+                {
+                    activity.DisplayName = $"PageAPI: {httpRequest.Method} {path}";
+                }
+                else if (path.Contains("/api/post/"))
+                {
+                    activity.DisplayName = $"PostAPI: {httpRequest.Method} {path}";
+                }
+                else if (path.Contains("/manager/"))
+                {
+                    activity.DisplayName = $"Manager: {httpRequest.Method} {path}";
+                }
+            };
+            options.EnrichWithHttpResponse = (activity, httpResponse) =>
+            {
+                activity.SetTag("http.response.content_type", httpResponse.ContentType);
+            };
+        })
+        .AddHttpClientInstrumentation(options =>
+        {
+            options.RecordException = true;
+            options.FilterHttpRequestMessage = (httpRequestMessage) =>
+            {
+                // Don't trace requests to telemetry endpoints
+                return !httpRequestMessage.RequestUri?.Host.Contains("localhost:4317") ?? true;
+            };
+        })
+        .AddSqlClientInstrumentation(options =>
+        {
+            options.RecordException = true;
+            options.SetDbStatementForText = true;
+            options.EnableConnectionLevelAttributes = true;
+        })
         .AddSource(serviceName)
+        .AddSource(piranhaServiceName) // Add Piranha CMS telemetry source
         .AddOtlpExporter(options =>
         {
             options.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317");
@@ -38,11 +97,21 @@ builder.Services.AddOpenTelemetry()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()
         .AddMeter(serviceName)
-        .AddPrometheusExporter());
+        .AddMeter("Piranha.Workflow") // Add our workflow metrics meter
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317");
+        })
+        .AddPrometheusExporter()); // Keep both for direct access
 
 // Configure logging
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
+builder.Logging.AddOpenTelemetry(options =>
+{
+    options.IncludeFormattedMessage = true;
+    options.IncludeScopes = true;
+});
 
 builder.AddPiranha(options =>
 {
@@ -104,6 +173,11 @@ builder.AddPiranha(options =>
      */
 });
 
+// Add workflow metrics services
+builder.Services.AddHostedService<WorkflowMetricsService>();
+builder.Services.AddHostedService<WorkflowMetricsEventHandler>();
+builder.Services.AddHostedService<TestMetricsService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -113,6 +187,64 @@ if (app.Environment.IsDevelopment())
 
 // Configure the HTTP request pipeline
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
+
+// Test endpoint to trigger workflow metrics
+app.MapGet("/test-workflow-metrics", () =>
+{
+    // Test all workflow metrics
+    var tags = new KeyValuePair<string, object?>[]
+    {
+        new("workflow_id", "test-workflow"),
+        new("from_state", "draft"),
+        new("to_state", "published"),
+        new("content_type", "page"),
+        new("user_role", "editor"),
+        new("success", "true")
+    };
+    
+    // Trigger all metrics
+    WorkflowMetricsProvider.TransitionCount.Add(1, tags);
+    WorkflowMetricsProvider.InstancesCreated.Add(1, tags);
+    WorkflowMetricsProvider.TransitionDuration.Record(250.5, tags);
+    WorkflowMetricsProvider.TransitionsByRole.Add(1, tags);
+    WorkflowMetricsProvider.ContentPublished.Add(1, tags);
+    
+    return Results.Json(new { 
+        message = "Workflow metrics triggered successfully",
+        metrics = new[] {
+            "workflow_transitions_total",
+            "workflow_instances_created_total", 
+            "workflow_transition_duration_ms",
+            "workflow_transitions_by_role_total",
+            "workflow_content_published_total"
+        }
+    });
+});
+
+// Add workflow metrics middleware
+app.UseWorkflowMetrics();
+
+// Add custom middleware to enrich traces with Piranha context
+app.Use(async (context, next) =>
+{
+    var activity = Activity.Current;
+    if (activity != null)
+    {
+        // Add custom tags for better trace identification
+        activity.SetTag("service.layer", "web");
+        activity.SetTag("app.name", "MvcWeb");
+        
+        // Add user context if authenticated
+        if (context.User?.Identity?.IsAuthenticated == true)
+        {
+            var userId = context.User.Identity.Name;
+            activity.SetTag(PiranhaTelemetry.AttributeNames.UserId, 
+                PiranhaTelemetry.MaskSensitiveData(userId, Piranha.Telemetry.SensitiveDataType.UserId));
+        }
+    }
+    
+    await next();
+});
 
 app.UsePiranha(options =>
 {

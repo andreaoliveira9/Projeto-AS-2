@@ -9,9 +9,11 @@
  */
 
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using Piranha.Cache;
 using Piranha.Models;
 using Piranha.Repositories;
+using Piranha.Telemetry;
 
 namespace Piranha.Services;
 
@@ -57,6 +59,10 @@ internal sealed class PageService : IPageService
     /// <returns>The created page</returns>
     public async Task<T> CreateAsync<T>(string typeId = null) where T : Models.PageBase
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.PageOperation, "Create");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "page.create");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentType, typeId ?? typeof(T).Name);
+        
         if (string.IsNullOrEmpty(typeId))
         {
             typeId = typeof(T).Name;
@@ -75,6 +81,7 @@ internal sealed class PageService : IPageService
             }
             return model;
         }
+        activity?.SetOperationStatus(false, "Page type not found");
         return null;
     }
 
@@ -145,6 +152,10 @@ internal sealed class PageService : IPageService
     /// <returns>The available models</returns>
     public async Task<IEnumerable<T>> GetAllAsync<T>(Guid? siteId = null) where T : PageBase
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.PageOperation, "GetAll");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "page.list");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.SiteId, siteId?.ToString());
+        
         var models = new List<T>();
         var pages = await _repo.GetAll(await EnsureSiteIdAsync(siteId).ConfigureAwait(false))
             .ConfigureAwait(false);

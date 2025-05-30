@@ -10,6 +10,7 @@
 
 #nullable enable
 
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ using Microsoft.Extensions.Options;
 using Piranha.Audit.Configuration;
 using Piranha.Audit.Events;
 using Piranha.Audit.Services;
+using Piranha.Telemetry;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -59,6 +61,9 @@ public sealed class AuditMessageConsumerService : BackgroundService
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.AuditOperation, "ConsumeMessages");
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "audit.consumer.start");
+        
         _logger.LogInformation("Audit message consumer service started");
 
         try
@@ -94,6 +99,9 @@ public sealed class AuditMessageConsumerService : BackgroundService
 
             _consumer.ReceivedAsync += async (sender, eventArgs) =>
             {
+                using var messageActivity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.AuditOperation, "ProcessMessage");
+                messageActivity?.SetTag(PiranhaTelemetry.AttributeNames.OperationType, "audit.message.process");
+                
                 var message = Encoding.UTF8.GetString(eventArgs.Body.ToArray());
                 var deliveryTag = eventArgs.DeliveryTag;
 

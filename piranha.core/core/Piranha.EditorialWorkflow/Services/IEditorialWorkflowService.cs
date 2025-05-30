@@ -15,6 +15,7 @@ public interface IEditorialWorkflowService
 
     // Workflow States
     Task<WorkflowState> CreateWorkflowStateAsync(WorkflowState state);
+    Task<WorkflowState> CreateWorkflowStateWithValidationAsync(WorkflowState state);
     Task<WorkflowState> UpdateWorkflowStateAsync(WorkflowState state);
     Task<WorkflowState> GetWorkflowStateByIdAsync(Guid id);
     Task<IEnumerable<WorkflowState>> GetWorkflowStatesByDefinitionAsync(Guid definitionId);

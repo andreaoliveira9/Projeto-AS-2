@@ -8,9 +8,11 @@
  *
  */
 
+using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Piranha.Models;
+using Piranha.Telemetry;
 
 namespace Piranha.WebApi;
 
@@ -42,6 +44,9 @@ public class PostApiController : Controller
     [Route("{id:Guid}")]
     public virtual async Task<IActionResult> GetById(Guid id)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.ApiOperation, "GetPostById");
+        activity?.EnrichWithHttp("GET", $"/api/post/{id}", User?.Identity?.Name);
+        activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentId, id.ToString());
         if (!Module.AllowAnonymousAccess)
         {
             if (!(await _auth.AuthorizeAsync(User, Permissions.Posts)).Succeeded)
@@ -49,7 +54,17 @@ public class PostApiController : Controller
                 return Unauthorized();
             }
         }
-        return Json(await _api.Posts.GetByIdAsync<PostBase>(id));
+        var post = await _api.Posts.GetByIdAsync<PostBase>(id);
+        if (post != null)
+        {
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentType, post.TypeId);
+            activity?.SetOperationStatus(true, "Post retrieved successfully");
+        }
+        else
+        {
+            activity?.SetOperationStatus(false, "Post not found");
+        }
+        return Json(post);
     }
 
     /// <summary>
@@ -63,6 +78,10 @@ public class PostApiController : Controller
     [Route("{archiveId}/{slug}")]
     public virtual async Task<IActionResult> GetBySlugAndArchive(Guid archiveId, string slug)
     {
+        using var activity = PiranhaTelemetry.StartActivity(PiranhaTelemetry.ActivityNames.ApiOperation, "GetPostBySlug");
+        activity?.EnrichWithHttp("GET", $"/api/post/{archiveId}/{slug}", User?.Identity?.Name);
+        activity?.SetTag("post.archive_id", archiveId.ToString());
+        activity?.SetTag("post.slug", slug);
         if (!Module.AllowAnonymousAccess)
         {
             if (!(await _auth.AuthorizeAsync(User, Permissions.Posts)).Succeeded)
@@ -70,7 +89,18 @@ public class PostApiController : Controller
                 return Unauthorized();
             }
         }
-        return Json(await _api.Posts.GetBySlugAsync<PostBase>(archiveId, slug));
+        var post = await _api.Posts.GetBySlugAsync<PostBase>(archiveId, slug);
+        if (post != null)
+        {
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentId, post.Id.ToString());
+            activity?.SetTag(PiranhaTelemetry.AttributeNames.ContentType, post.TypeId);
+            activity?.SetOperationStatus(true, "Post retrieved successfully");
+        }
+        else
+        {
+            activity?.SetOperationStatus(false, "Post not found");
+        }
+        return Json(post);
     }
 
     /// <summary>

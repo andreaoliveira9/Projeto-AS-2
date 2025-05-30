@@ -1,0 +1,14 @@
+{
+  "name": "workflow-load-tests",
+  "version": "1.0.0",
+  "description": "Load tests for Piranha CMS Workflow API",
+  "scripts": {
+    "test": "k6 run workflow-load-test.js",
+    "test:cloud": "k6 cloud workflow-load-test.js",
+    "verify": "./verify-workflow-endpoints.sh",
+    "install-k6": "curl https://github.com/grafana/k6/releases/download/v0.47.0/k6-v0.47.0-linux-amd64.tar.gz -L | tar xvz --strip-components 1 -C /usr/local/bin"
+  },
+  "keywords": ["k6", "load-testing", "performance", "workflow"],
+  "author": "",
+  "license": "MIT"
+}

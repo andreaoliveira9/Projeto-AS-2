@@ -8,16 +8,17 @@
  *
  */
 
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Piranha.Data;
 using Piranha.Services;
+using Piranha.Telemetry;
 
 namespace Piranha.Repositories;
 
-internal class PageRepository : IPageRepository
+internal class PageRepository : BaseRepository, IPageRepository
 {
-    private readonly IDb _db;
     private readonly IContentService<Page, PageField, Models.PageBase> _contentService;
 
     /// <summary>
@@ -25,9 +26,8 @@ internal class PageRepository : IPageRepository
     /// </summary>
     /// <param name="db">The current db context</param>
     /// <param name="factory">The content service factory</param>
-    public PageRepository(IDb db, IContentServiceFactory factory)
+    public PageRepository(IDb db, IContentServiceFactory factory) : base(db)
     {
-        _db = db;
         _contentService = factory.CreatePageService();
     }
 
@@ -38,14 +38,22 @@ internal class PageRepository : IPageRepository
     /// <returns>The pages</returns>
     public async Task<IEnumerable<Guid>> GetAll(Guid siteId)
     {
-        return await _db.Pages
-            .AsNoTracking()
-            .Where(p => p.SiteId == siteId)
-            .OrderBy(p => p.ParentId)
-            .ThenBy(p => p.SortOrder)
-            .Select(p => p.Id)
-            .ToListAsync()
-            .ConfigureAwait(false);
+        return await ExecuteWithTracingAsync(
+            "SELECT",
+            "Pages",
+            async () => await _db.Pages
+                .AsNoTracking()
+                .Where(p => p.SiteId == siteId)
+                .OrderBy(p => p.ParentId)
+                .ThenBy(p => p.SortOrder)
+                .Select(p => p.Id)
+                .ToListAsync()
+                .ConfigureAwait(false),
+            new Dictionary<string, object>
+            {
+                { PiranhaTelemetry.AttributeNames.SiteId, siteId.ToString() },
+                { "db.query", "GetAll Pages" }
+            });
     }
 
     /// <summary>
@@ -137,15 +145,26 @@ internal class PageRepository : IPageRepository
     /// <returns>The page model</returns>
     public async Task<T> GetById<T>(Guid id) where T : Models.PageBase
     {
-        var page = await GetQuery<T>()
-            .FirstOrDefaultAsync(p => p.Id == id)
-            .ConfigureAwait(false);
+        return await ExecuteWithTracingAsync(
+            "SELECT",
+            "Pages",
+            async () =>
+            {
+                var page = await GetQuery<T>()
+                    .FirstOrDefaultAsync(p => p.Id == id)
+                    .ConfigureAwait(false);
 
-        if (page != null)
-        {
-            return await _contentService.TransformAsync<T>(page, App.PageTypes.GetById(page.PageTypeId), ProcessAsync);
-        }
-        return null;
+                if (page != null)
+                {
+                    return await _contentService.TransformAsync<T>(page, App.PageTypes.GetById(page.PageTypeId), ProcessAsync);
+                }
+                return null;
+            },
+            new Dictionary<string, object>
+            {
+                { PiranhaTelemetry.AttributeNames.ContentId, id.ToString() },
+                { "db.query", "GetById Page" }
+            });
     }
 
     /// <summary>

@@ -26,3 +26,10 @@ scrape_configs:
     static_configs:
       - targets: ['mvcweb-jaeger:8889']
     scrape_interval: 10s
+  
+  # Scrape metrics from OpenTelemetry Collector
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['mvcweb-otel-collector:8889']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
