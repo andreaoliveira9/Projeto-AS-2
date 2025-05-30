@@ -95,7 +95,7 @@ public static class Menu
                     InternalId = "WorkflowList",
                     Name = "Editorial Workflows",
                     Route = "~/manager/workflows",
-                    Policy = Permission.Admin,
+                    Policy = Permission.Workflows,
                     Css = "fas fa-project-diagram"
                 }
             }
