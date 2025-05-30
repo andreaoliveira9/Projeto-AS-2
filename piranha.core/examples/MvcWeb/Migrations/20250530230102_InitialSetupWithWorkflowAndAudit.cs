@@ -844,12 +844,7 @@ namespace MvcWeb.Migrations
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     ContentId = table.Column<string>(type: "TEXT", maxLength: 450, nullable: false),
-                    ContentType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
-                    CurrentWorkflowInstanceId = table.Column<Guid>(type: "TEXT", nullable: true),
-                    IsInWorkflow = table.Column<bool>(type: "INTEGER", nullable: false),
-                    LastWorkflowState = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
-                    Created = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    LastModified = table.Column<DateTime>(type: "TEXT", nullable: false)
+                    CurrentWorkflowInstanceId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -1343,19 +1338,9 @@ namespace MvcWeb.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Piranha_WorkflowContentExtensions_ContentType",
-                table: "Piranha_WorkflowContentExtensions",
-                column: "ContentType");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Piranha_WorkflowContentExtensions_CurrentWorkflowInstanceId",
                 table: "Piranha_WorkflowContentExtensions",
                 column: "CurrentWorkflowInstanceId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Piranha_WorkflowContentExtensions_IsInWorkflow",
-                table: "Piranha_WorkflowContentExtensions",
-                column: "IsInWorkflow");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Piranha_WorkflowDefinitions_Created",

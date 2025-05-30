@@ -166,11 +166,7 @@ public static class EditorialWorkflowAndAuditDbExtensions
         var workflowContentExt = modelBuilder.Entity<WorkflowContentExtension>();
         workflowContentExt.HasKey(e => e.Id);
         workflowContentExt.Property(e => e.ContentId).IsRequired().HasMaxLength(450);
-        workflowContentExt.Property(e => e.ContentType).IsRequired().HasMaxLength(50);
-        workflowContentExt.Property(e => e.LastWorkflowState).HasMaxLength(50);
         workflowContentExt.HasIndex(e => e.ContentId).IsUnique();
-        workflowContentExt.HasIndex(e => e.ContentType);
-        workflowContentExt.HasIndex(e => e.IsInWorkflow);
         workflowContentExt.HasIndex(e => e.CurrentWorkflowInstanceId);
         workflowContentExt.HasOne(e => e.CurrentWorkflowInstance)
             .WithMany()

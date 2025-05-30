@@ -27,34 +27,9 @@ public sealed class WorkflowContentExtension
     public string ContentId { get; set; }
 
     /// <summary>
-    /// Gets/sets the type of content for quick reference.
-    /// </summary>
-    public string ContentType { get; set; }
-
-    /// <summary>
     /// Gets/sets the current workflow instance ID (if any).
     /// </summary>
     public Guid? CurrentWorkflowInstanceId { get; set; }
-
-    /// <summary>
-    /// Gets/sets if content is currently in an active workflow.
-    /// </summary>
-    public bool IsInWorkflow { get; set; } = false;
-
-    /// <summary>
-    /// Gets/sets the last workflow state for quick access.
-    /// </summary>
-    public string LastWorkflowState { get; set; }
-
-    /// <summary>
-    /// Gets/sets when the extension was created.
-    /// </summary>
-    public DateTime Created { get; set; }
-
-    /// <summary>
-    /// Gets/sets when the extension was last modified.
-    /// </summary>
-    public DateTime LastModified { get; set; }
 
     /// <summary>
     /// Gets/sets the current workflow instance.

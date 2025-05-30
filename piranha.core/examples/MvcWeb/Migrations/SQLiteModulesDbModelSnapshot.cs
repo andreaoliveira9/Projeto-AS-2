@@ -566,25 +566,7 @@ namespace MvcWeb.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("TEXT");
-
                     b.Property<Guid?>("CurrentWorkflowInstanceId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsInWorkflow")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("LastModified")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LastWorkflowState")
-                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -592,11 +574,7 @@ namespace MvcWeb.Migrations
                     b.HasIndex("ContentId")
                         .IsUnique();
 
-                    b.HasIndex("ContentType");
-
                     b.HasIndex("CurrentWorkflowInstanceId");
-
-                    b.HasIndex("IsInWorkflow");
 
                     b.ToTable("Piranha_WorkflowContentExtensions", (string)null);
                 });
