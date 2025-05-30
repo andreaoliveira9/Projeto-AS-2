@@ -33,14 +33,29 @@ public class EditorialWorkflowController : ControllerBase
     {
         return _environment.IsDevelopment() || _environment.EnvironmentName.Equals("Testing", StringComparison.OrdinalIgnoreCase);
     }
+    
+    /// <summary>
+    /// Helper method to check if user has workflow permissions
+    /// </summary>
+    private bool HasWorkflowPermission()
+    {
+        // In development/testing, allow anonymous access
+        if (AllowAnonymousForTesting())
+            return true;
+            
+        // Check if user is authenticated and has either Admin or Workflows permission
+        return User.Identity.IsAuthenticated && 
+               (User.HasClaim("Permission", "PiranhaAdmin") || 
+                User.HasClaim("Permission", "PiranhaWorkflows"));
+    }
 
     #region Workflow Definitions
 
     [HttpGet("definitions")]
     public async Task<ActionResult<IEnumerable<WorkflowDefinition>>> GetWorkflowDefinitions()
     {
-        // Allow anonymous access in development/testing environments for load testing
-        if (!AllowAnonymousForTesting() && !User.Identity.IsAuthenticated)
+        // Check if user has workflow permissions (includes dev/test anonymous access)
+        if (!HasWorkflowPermission())
         {
             return Unauthorized();
         }

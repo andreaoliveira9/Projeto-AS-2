@@ -19,6 +19,9 @@ services:
       - prometheus
       - grafana
       - rabbitmq
+      - otel-collector
+    # Wait 10 seconds before starting to let other services initialize
+    command: ["sh", "-c", "sleep 10 && dotnet MvcWeb.dll"]
     networks:
       - telemetry
 
