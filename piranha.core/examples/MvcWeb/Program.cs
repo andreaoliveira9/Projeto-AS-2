@@ -4,6 +4,7 @@ using Piranha;
 using Piranha.AspNetCore.Identity.SQLite;
 using Piranha.AttributeBuilder;
 using Piranha.EditorialWorkflow.Extensions;
+using Piranha.Notifications.Extensions;
 using Piranha.Audit.Extensions;
 using Piranha.Manager.Editor;
 using Piranha.Data.EF.EditorialWorkflowAndAudit;
@@ -36,6 +37,15 @@ builder.AddPiranha(options =>
         rabbitMQOptions.MaxRetryAttempts = 5;
     });
     options.UseAuditEF();
+
+    // Audit 
+    options.UseNotifications(rabbitMQOptions => {
+        rabbitMQOptions.HostName = "localhost";
+        rabbitMQOptions.UserName = "user";
+        rabbitMQOptions.Password = "password";
+        rabbitMQOptions.QueueName = "notifications.WorkflowStateChanged";
+        rabbitMQOptions.MaxRetryAttempts = 5;
+    });
 
     options.UseFileStorage(naming: Piranha.Local.FileStorageNaming.UniqueFolderNames);
     options.UseImageSharp();
