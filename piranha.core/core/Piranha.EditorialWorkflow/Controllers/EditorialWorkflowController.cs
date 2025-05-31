@@ -9,7 +9,7 @@ namespace Piranha.EditorialWorkflow.Controllers;
 
 [ApiController]
 [Route("api/workflow")]
-//[Authorize]
+[Authorize]
 public class EditorialWorkflowController : ControllerBase
 {
     private readonly IEditorialWorkflowService _workflowService;
