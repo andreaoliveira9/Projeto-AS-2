@@ -377,4 +377,75 @@ public class PageApiController : Controller
 
         return ret;
     }
+    
+    /// <summary>
+    /// Applies a workflow to a page
+    /// </summary>
+    /// <param name="model">The workflow model</param>
+    /// <returns>Status</returns>
+    [Route("workflow/apply")]
+    [HttpPost]
+    [Authorize(Policy = Permission.PagesEdit)]
+    public async Task<StatusMessage> ApplyWorkflow([FromBody]dynamic model)
+    {
+        if (model == null)
+        {
+            return new StatusMessage
+            {
+                Type = StatusMessage.Error,
+                Body = _localizer.General["Invalid request data"]
+            };
+        }
+        
+        string contentId = null;
+        string workflowId = null;
+        
+        try
+        {
+            contentId = model.contentId?.ToString();
+            workflowId = model.currentWorkflowInstanceId?.ToString();
+            
+            if (string.IsNullOrEmpty(contentId) || string.IsNullOrEmpty(workflowId))
+            {
+                return new StatusMessage
+                {
+                    Type = StatusMessage.Error,
+                    Body = _localizer.General["Invalid request data"]
+                };
+            }
+            
+            // Get the page
+            var page = await _service.GetById(Guid.Parse(contentId));
+            if (page != null)
+            {
+                // Set the selected workflow ID
+                page.SelectedWorkflowId = Guid.Parse(workflowId);
+                
+                // Save the page
+                await _service.Save(page, false);
+                
+                return new StatusMessage
+                {
+                    Type = StatusMessage.Success,
+                    Body = _localizer.General["The workflow was successfully applied to the page"]
+                };
+            }
+            else
+            {
+                return new StatusMessage
+                {
+                    Type = StatusMessage.Error,
+                    Body = _localizer.General["The page could not be found"]
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            return new StatusMessage
+            {
+                Type = StatusMessage.Error,
+                Body = $"Error: {ex.Message}"
+            };
+        }
+    }
 }

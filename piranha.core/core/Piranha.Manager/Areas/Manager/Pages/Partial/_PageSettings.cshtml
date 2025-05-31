@@ -258,6 +258,38 @@
                             <option v-if="redirectUrl !== null && redirectUrl.length > 0" value="Temporary">@Localizer.General["Temporary"]</option><option v-else value="Temporary"></option>
                         </select>
                     </div>
+                    
+                    <!-- Workflow Selection -->
+                    <div class="form-group">
+                        <label>@Localizer.General["Workflow"]</label>
+                        <div class="card bg-light mb-2">
+                            <div class="card-body py-2">
+                                <div v-if="currentWorkflow" class="d-flex align-items-center">
+                                    <div>
+                                        <span class="badge badge-primary px-2 py-1 mr-2">{{ currentWorkflow.currentState }}</span>
+                                        <strong>{{ currentWorkflow.name }}</strong>
+                                    </div>
+                                    <a href="#" v-on:click.prevent="removeWorkflow()" class="btn btn-sm btn-danger ml-auto">
+                                        <i class="fas fa-times"></i>
+                                    </a>
+                                </div>
+                                <div v-if="!currentWorkflow" class="text-muted small">
+                                    @Localizer.General["No workflow selected"]
+                                </div>
+                            </div>
+                        </div>
+                        <select v-model="selectedWorkflowId" class="form-control" :disabled="currentWorkflow != null">
+                            <option value="">-- @Localizer.General["Select Workflow"] --</option>
+                            <option v-for="wf in availableWorkflows" :value="wf.id">{{ wf.name }}</option>
+                        </select>
+                        <button v-if="selectedWorkflowId && !currentWorkflow" v-on:click.prevent="applyWorkflow()" class="btn btn-sm btn-primary mt-2">
+                            <i class="fas fa-check"></i> @Localizer.General["Apply Workflow"]
+                        </button>
+                        <span class="field-description small text-muted">
+                            @Localizer.General["Selecting a workflow will apply it to this page when saved."]
+                        </span>
+                    </div>
+                    
                     <div v-if="permissions.length > 0">
                         <div class="form-group">
                             <label>@Localizer.General["Permissions"]</label>

@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Run and build commands are inside /home/alexandre/Documents/Projeto-AS-2/piranha.core/examples/MvcWeb,
+To run you must use cd /media/alexandre/New Volume/Ubuntu/Projeto-AS-2/piranha.core/examples/MvcWeb && dotnet run --framework net9.0
+
+All executions must run inline, do not open external tabs/windows when running a command.

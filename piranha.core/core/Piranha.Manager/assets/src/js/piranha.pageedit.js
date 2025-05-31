@@ -62,7 +62,10 @@ piranha.pageedit = new Vue({
         },
         selectedSetting: "uid-settings",
         selectedRoute: null,
-        routes: []
+        routes: [],
+        selectedWorkflowId: null,
+        currentWorkflow: null,
+        availableWorkflows: []
     },
     computed: {
         contentRegions: function () {
@@ -149,6 +152,14 @@ piranha.pageedit = new Vue({
             this.permissions = model.permissions;
             this.primaryImage = model.primaryImage;
             this.selectedPermissions = model.selectedPermissions;
+            this.selectedWorkflowId = model.selectedWorkflowId;
+            this.currentWorkflow = model.currentWorkflow || null;
+            this.availableWorkflows = model.availableWorkflows || [];
+
+            // If we don't have any workflows loaded, fetch them
+            if (!this.availableWorkflows || this.availableWorkflows.length === 0) {
+                this.fetchAvailableWorkflows();
+            }
 
             if (!this.useBlocks) {
                 // First choice, select the first custom editor
@@ -179,10 +190,10 @@ piranha.pageedit = new Vue({
                 .catch(function (error) { console.log("error:", error );
             });
         },
-        create: function (id, pageType) {
+        create: function (siteId, typeId) {
             var self = this;
 
-            fetch(piranha.baseUrl + "manager/api/page/create/" + id + "/" + pageType)
+            fetch(piranha.baseUrl + "manager/api/page/create/" + siteId + "/" + typeId)
                 .then(function (response) { return response.json(); })
                 .then(function (result) {
                     self.bind(result);
@@ -287,6 +298,8 @@ piranha.pageedit = new Vue({
                 primaryImage: {
                     id: self.primaryImage.id
                 },
+                selectedWorkflowId: self.selectedWorkflowId,
+                currentWorkflow: self.currentWorkflow
             };
 
             fetch(route, {
@@ -305,6 +318,8 @@ piranha.pageedit = new Vue({
                 self.state = result.state;
                 self.isCopy = result.isCopy;
                 self.selectedRoute = result.selectedRoute;
+                self.selectedWorkflowId = result.selectedWorkflowId;
+                self.currentWorkflow = result.currentWorkflow;
 
                 if (oldState === 'new' && result.state !== 'new') {
                     window.history.replaceState({ state: "created"}, "Edit page", piranha.baseUrl + "manager/page/edit/" + result.id);
@@ -460,9 +475,111 @@ piranha.pageedit = new Vue({
             } else {
                 this.excerpt = e.target.innerHTML;
             }
+        },
+        fetchAvailableWorkflows: function() {
+            var self = this;
+            
+            fetch(piranha.baseUrl + "manager/api/page/workflows")
+                .then(function (response) { return response.json(); })
+                .then(function (result) {
+                    if (Array.isArray(result)) {
+                        self.availableWorkflows = result
+                            .filter(function(wf) { return wf.isActive; })
+                            .map(function(wf) {
+                                return {
+                                    id: wf.id,
+                                    name: wf.name,
+                                    isActive: wf.isActive
+                                };
+                            });
+                    }
+                })
+                .catch(function (error) { 
+                    console.log("Error fetching available workflows:", error);
+                });
+        },
+        applyWorkflow: function () {
+            console.log("==== APPLY WORKFLOW FUNCTION CALLED ====");
+            console.log("selectedWorkflowId:", this.selectedWorkflowId);
+            console.log("currentWorkflow:", this.currentWorkflow);
+            console.log("page ID:", this.id);
+            
+            if (!this.selectedWorkflowId) {
+                console.log("ERROR: No workflow selected, returning early");
+                return;
+            }
+            
+            console.log("Applying workflow, page ID:", this.id, "workflow ID:", this.selectedWorkflowId);
+
+            var self = this;
+            var data = {
+                contentId: this.id.toString(),
+                currentWorkflowInstanceId: this.selectedWorkflowId.toString()
+            };
+            
+            console.log("Request payload:", JSON.stringify(data));
+            
+            fetch(piranha.baseUrl + "manager/api/page/workflow/apply", {
+                method: "post",
+                headers: piranha.utils.antiForgeryHeaders(),
+                body: JSON.stringify(data)
+            })
+            .then(function (response) { 
+                console.log("Response received, status:", response.status);
+                if (!response.ok) {
+                    console.log("Error response:", response);
+                    return response.text().then(text => {
+                        console.log("Error response text:", text);
+                        throw new Error(text || "Error applying workflow");
+                    });
+                }
+                console.log("Response is OK, parsing JSON");
+                return response.json(); 
+            })
+            .then(function (result) {
+                console.log("Workflow applied successfully, result:", result);
+                self.get(self.id);
+                
+                piranha.notifications.push(result);
+            })
+            .catch(function (error) {
+                console.log("Error applying workflow:", error);
+                piranha.notifications.push({
+                    type: "danger",
+                    body: "Error applying workflow: " + error.message
+                });
+            });
+        },
+        removeWorkflow: function () {
+            if (!this.currentWorkflow) {
+                return;
+            }
+
+            var self = this;
+            fetch(piranha.baseUrl + "manager/api/page/workflow/remove", {
+                method: "post",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(this.id)
+            })
+            .then(function (response) { return response.json(); })
+            .then(function (result) {
+                self.currentWorkflow = null;
+                
+                piranha.notifications.push(result);
+            })
+            .catch(function (error) {
+                console.log("Error removing workflow: " + error);
+            });
+        },
+        get: function (id) {
+            this.load(id);
         }
     },
     created: function () {
+        // Fetch available workflows when component is created
+        this.fetchAvailableWorkflows();
     },
     updated: function () {
         if (this.loading)
