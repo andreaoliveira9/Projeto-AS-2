@@ -35,7 +35,12 @@ public interface IEditorialWorkflowService
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByStateAsync(string state);
     Task<WorkflowInstance> GetWorkflowInstanceByIdAsync(Guid id);
 
+    // Workflow Content Extensions
+    Task<bool> WorkflowContentExtensionExistsAsync(string contentId);
+    Task<Piranha.EditorialWorkflow.Models.WorkflowContentExtension> GetWorkflowContentExtensionAsync(string contentId);
+    Task<WorkflowInstance> CreateWorkflowInstanceWithContentAsync(string contentId, Guid workflowDefinitionId, string contentType = null, string contentTitle = null);
+
     // Debug methods
     Task<bool> TestDatabaseConnectionAsync();
     Task<IEnumerable<Piranha.AspNetCore.Identity.Data.Role>> GetSystemRolesAsync();
-} 
+}
