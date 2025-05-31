@@ -134,6 +134,129 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         }
     }
 
+    // NEW METHOD - Get WorkflowContentExtensions by WorkflowDefinitionId
+    public async Task<IEnumerable<WorkflowContentExtension>> GetWorkflowContentExtensionsByDefinitionAsync(Guid workflowDefinitionId)
+    {
+        _logger.LogInformation("GetWorkflowContentExtensionsByDefinitionAsync: Retrieving content extensions for WorkflowDefinitionId: {WorkflowDefinitionId}", workflowDefinitionId);
+        
+        try
+        {
+            if (workflowDefinitionId == Guid.Empty)
+            {
+                _logger.LogWarning("GetWorkflowContentExtensionsByDefinitionAsync: WorkflowDefinitionId is empty");
+                return new List<WorkflowContentExtension>();
+            }
+
+            // Get all workflow instances for this definition
+            var workflowInstances = await _workflowInstanceRepository.GetByWorkflow(workflowDefinitionId);
+            var instanceIds = workflowInstances.Select(wi => wi.Id).ToList();
+
+            // Get all active workflow content extensions
+            var allExtensions = await _contentExtensionRepository.GetActiveWorkflows();
+            
+            // Filter by workflow definition
+            var filteredExtensions = allExtensions.Where(ext => 
+                ext.CurrentWorkflowInstanceId.HasValue && 
+                instanceIds.Contains(ext.CurrentWorkflowInstanceId.Value)).ToList();
+
+            _logger.LogInformation("GetWorkflowContentExtensionsByDefinitionAsync: Found {Count} content extensions for WorkflowDefinitionId: {WorkflowDefinitionId}", 
+                filteredExtensions.Count, workflowDefinitionId);
+            
+            return filteredExtensions;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetWorkflowContentExtensionsByDefinitionAsync: Error retrieving content extensions for WorkflowDefinitionId: {WorkflowDefinitionId}", workflowDefinitionId);
+            throw;
+        }
+    }
+
+    // NEW METHOD - Partial update for WorkflowInstance
+    public async Task<WorkflowInstance> PartialUpdateWorkflowInstanceAsync(Guid workflowInstanceId, WorkflowInstance partialUpdate)
+    {
+        _logger.LogInformation("PartialUpdateWorkflowInstanceAsync: Starting partial update for WorkflowInstanceId: {WorkflowInstanceId}", workflowInstanceId);
+        
+        try
+        {
+            if (workflowInstanceId == Guid.Empty)
+            {
+                _logger.LogWarning("PartialUpdateWorkflowInstanceAsync: WorkflowInstanceId is empty");
+                throw new ArgumentException("WorkflowInstanceId cannot be empty", nameof(workflowInstanceId));
+            }
+
+            // Get the existing workflow instance
+            var existingInstance = await _workflowInstanceRepository.GetById(workflowInstanceId);
+            if (existingInstance == null)
+            {
+                _logger.LogWarning("PartialUpdateWorkflowInstanceAsync: WorkflowInstance not found with ID: {WorkflowInstanceId}", workflowInstanceId);
+                throw new InvalidOperationException($"WorkflowInstance not found with ID: {workflowInstanceId}");
+            }
+
+            // Only update fields that are provided (not null/empty)
+            if (!string.IsNullOrWhiteSpace(partialUpdate?.ContentId))
+            {
+                existingInstance.ContentId = partialUpdate.ContentId;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated ContentId to {ContentId}", partialUpdate.ContentId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(partialUpdate?.ContentType))
+            {
+                existingInstance.ContentType = partialUpdate.ContentType;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated ContentType to {ContentType}", partialUpdate.ContentType);
+            }
+
+            if (!string.IsNullOrWhiteSpace(partialUpdate?.ContentTitle))
+            {
+                existingInstance.ContentTitle = partialUpdate.ContentTitle;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated ContentTitle to {ContentTitle}", partialUpdate.ContentTitle);
+            }
+
+            if (partialUpdate?.WorkflowDefinitionId != null && partialUpdate.WorkflowDefinitionId != Guid.Empty)
+            {
+                existingInstance.WorkflowDefinitionId = partialUpdate.WorkflowDefinitionId;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated WorkflowDefinitionId to {WorkflowDefinitionId}", partialUpdate.WorkflowDefinitionId);
+            }
+
+            if (partialUpdate?.CurrentStateId != null && partialUpdate.CurrentStateId != Guid.Empty)
+            {
+                existingInstance.CurrentStateId = partialUpdate.CurrentStateId;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated CurrentStateId to {CurrentStateId}", partialUpdate.CurrentStateId);
+            }
+
+            if (partialUpdate?.Status != null)
+            {
+                existingInstance.Status = partialUpdate.Status;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated Status to {Status}", partialUpdate.Status);
+            }
+
+            if (!string.IsNullOrWhiteSpace(partialUpdate?.Metadata))
+            {
+                existingInstance.Metadata = partialUpdate.Metadata;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated Metadata");
+            }
+
+            if (partialUpdate?.CompletedAt != null)
+            {
+                existingInstance.CompletedAt = partialUpdate.CompletedAt;
+                _logger.LogDebug("PartialUpdateWorkflowInstanceAsync: Updated CompletedAt to {CompletedAt}", partialUpdate.CompletedAt);
+            }
+
+            // Always update LastModified
+            existingInstance.LastModified = DateTime.UtcNow;
+
+            // Save the updated instance
+            await _workflowInstanceRepository.Save(existingInstance);
+            
+            _logger.LogInformation("PartialUpdateWorkflowInstanceAsync: Successfully updated WorkflowInstance {WorkflowInstanceId}", workflowInstanceId);
+            return existingInstance;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PartialUpdateWorkflowInstanceAsync: Error updating WorkflowInstance {WorkflowInstanceId}", workflowInstanceId);
+            throw;
+        }
+    }
+
     // Workflow Content Extensions
     public async Task<bool> WorkflowContentExtensionExistsAsync(string contentId)
     {

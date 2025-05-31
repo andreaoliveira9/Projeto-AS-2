@@ -30,6 +30,7 @@ public interface IEditorialWorkflowService
     // Workflow Instances
     Task<WorkflowInstance> CreateWorkflowInstanceAsync(WorkflowInstance instance);
     Task<WorkflowInstance> UpdateWorkflowInstanceAsync(WorkflowInstance instance);
+    Task<WorkflowInstance> PartialUpdateWorkflowInstanceAsync(Guid workflowInstanceId, WorkflowInstance partialUpdate);
     Task<bool> TransitionWorkflowAsync(Guid instanceId, string targetState);
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByUserAsync();
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByStateAsync(string state);
@@ -39,6 +40,7 @@ public interface IEditorialWorkflowService
     Task<bool> WorkflowContentExtensionExistsAsync(string contentId);
     Task<Piranha.EditorialWorkflow.Models.WorkflowContentExtension> GetWorkflowContentExtensionAsync(string contentId);
     Task<WorkflowInstance> CreateWorkflowInstanceWithContentAsync(string contentId, Guid workflowDefinitionId, string contentType = null, string contentTitle = null);
+    Task<IEnumerable<WorkflowContentExtension>> GetWorkflowContentExtensionsByDefinitionAsync(Guid workflowDefinitionId);
 
     // Debug methods
     Task<bool> TestDatabaseConnectionAsync();
