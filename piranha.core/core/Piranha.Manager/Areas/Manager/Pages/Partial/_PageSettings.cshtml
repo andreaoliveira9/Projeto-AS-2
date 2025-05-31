@@ -121,6 +121,29 @@
                             <div class="content-blocker"></div>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label>Workflow</label>
+                        <select v-model="selectedWorkflow" class="form-control" v-on:focus="loadWorkflowsIfNeeded">
+                            <option value="">Select Workflow</option>
+                            <option v-for="workflow in workflowDefinitions" :value="workflow.id">
+                                {{ workflow.name }} {{ workflow.isActive ? '' : '(Inactive)' }}
+                            </option>
+                        </select>
+                        <div v-if="selectedWorkflow && getSelectedWorkflowDetails()" class="mt-2">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ getSelectedWorkflowDetails().name }}</h6>
+                                    <p class="card-text" v-if="getSelectedWorkflowDetails().description">{{ getSelectedWorkflowDetails().description }}</p>
+                                    <small class="text-muted">
+                                        ID: {{ getSelectedWorkflowDetails().id }} | 
+                                        Status: <span :class="getSelectedWorkflowDetails().isActive ? 'text-success' : 'text-muted'">
+                                            {{ getSelectedWorkflowDetails().isActive ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div :class="{ 'd-none': selectedSetting != 'uid-seo' }">
