@@ -1,0 +1,351 @@
+@page "~/manager/workflow-instances"
+@inject ManagerLocalizer Localizer
+@{
+    ViewBag.Title = "Workflow Instances";
+    ViewBag.MenuItem = "Pages";
+}
+@section script
+{
+    <script src="~/manager/assets/js/piranha.components.min.js?v=@Piranha.Utils.GetAssemblyVersionHash(typeof(Piranha.Manager.Module).Assembly)"></script>
+    
+    <script type="text/javascript">
+        // Workflow Instances Management
+        var workflowInstances = new Vue({
+            el: '#workflow-instances',
+            data: {
+                loading: true,
+                instances: [],
+                contentExtensions: {},
+                workflowDefinitions: {},
+                editingInstance: null,
+                editModal: false,
+                error: null
+            },
+            methods: {
+                // Load all workflow instances (not user-filtered)
+                load: function() {
+                    var self = this;
+                    self.loading = true;
+                    self.error = null;
+                    
+                    fetch('/api/workflow/workflow-instances', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to load workflow instances');
+                        }
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        self.instances = data || [];
+                        self.loadWorkflowDefinitions();
+                    })
+                    .catch(function(error) {
+                        console.error('Error loading workflow instances:', error);
+                        self.error = 'Failed to load workflow instances';
+                        self.loading = false;
+                    });
+                },
+                
+                // Load workflow definitions for display names
+                loadWorkflowDefinitions: function() {
+                    var self = this;
+                    
+                    fetch('/api/workflow/definitions', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(response) {
+                        return response.json();
+                    })
+                    .then(function(definitions) {
+                        definitions.forEach(function(def) {
+                            self.$set(self.workflowDefinitions, def.id, def);
+                        });
+                        self.loading = false;
+                    })
+                    .catch(function(error) {
+                        console.error('Error loading workflow definitions:', error);
+                        self.loading = false;
+                    });
+                },
+                
+                // Open edit modal
+                editInstance: function(instance) {
+                    this.editingInstance = JSON.parse(JSON.stringify(instance)); // Deep copy
+                    this.editModal = true;
+                },
+                
+                // Update workflow instance
+                updateInstance: function() {
+                    var self = this;
+                    
+                    if (!self.editingInstance) return;
+                    
+                    fetch('/api/workflow/workflow-instances/' + self.editingInstance.id, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(self.editingInstance)
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to update workflow instance');
+                        }
+                        return response.json();
+                    })
+                    .then(function(updatedInstance) {
+                        // Update the instance in the list
+                        var index = self.instances.findIndex(function(i) { return i.id === updatedInstance.id; });
+                        if (index !== -1) {
+                            self.$set(self.instances, index, updatedInstance);
+                        }
+                        self.editModal = false;
+                        self.editingInstance = null;
+                        
+                        // Show success message
+                        piranha.notifications.push({
+                            body: "Workflow instance updated successfully",
+                            type: "success",
+                            hide: true
+                        });
+                    })
+                    .catch(function(error) {
+                        console.error('Error updating workflow instance:', error);
+                        piranha.notifications.push({
+                            body: "Failed to update workflow instance",
+                            type: "danger",
+                            hide: true
+                        });
+                    });
+                },
+                
+                // Cancel edit
+                cancelEdit: function() {
+                    this.editModal = false;
+                    this.editingInstance = null;
+                },
+                
+                // Format date
+                formatDate: function(dateString) {
+                    if (!dateString) return 'N/A';
+                    return new Date(dateString).toLocaleString();
+                },
+                
+                // Get status badge class
+                getStatusClass: function(status) {
+                    switch (status) {
+                        case 'Active': return 'badge-success';
+                        case 'Completed': return 'badge-primary';
+                        case 'Cancelled': return 'badge-danger';
+                        case 'OnHold': return 'badge-warning';
+                        default: return 'badge-secondary';
+                    }
+                },
+                
+                // Get workflow definition name
+                getWorkflowDefinitionName: function(workflowDefinitionId) {
+                    var def = this.workflowDefinitions[workflowDefinitionId];
+                    return def ? def.name : 'Unknown Workflow';
+                }
+            },
+            mounted: function() {
+                this.load();
+            }
+        });
+    </script>
+}
+
+<div id="workflow-instances">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">@Localizer.Menu["System"]</li>
+                <li class="breadcrumb-item">@Localizer.Menu["Editorial Workflows"]</li>
+                <li class="breadcrumb-item active" aria-current="page">Workflow Instances</li>
+            </ol>
+        </nav>
+
+        <div class="container-fluid">
+            <div class="top-nav">
+                <div class="title">
+                    <h2>Workflow Instances</h2>
+                    <small class="text-muted">Manage all workflow instances across the system</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid app" :class="{ ready: !loading }">
+        <!-- Loading spinner -->
+        <div v-if="loading" class="row">
+            <div class="col text-center">
+                <div class="spinner-border" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                <p class="mt-2">Loading workflow instances...</p>
+            </div>
+        </div>
+
+        <!-- Error message -->
+        <div v-if="error && !loading" class="row">
+            <div class="col">
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    {{ error }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Instances table -->
+        <div v-if="!loading && !error" class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-tasks"></i>
+                            All Workflow Instances
+                            <span class="badge badge-secondary ml-2">{{ instances.length }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0" v-if="instances.length > 0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Content</th>
+                                        <th>Content Type</th>
+                                        <th>Workflow</th>
+                                        <th>Status</th>
+                                        <th>Created By</th>
+                                        <th>Created</th>
+                                        <th>Last Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="instance in instances" :key="instance.id">
+                                        <td>
+                                            <div>
+                                                <strong>{{ instance.contentTitle || 'Untitled' }}</strong>
+                                                <br>
+                                                <small class="text-muted">ID: {{ instance.contentId }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-info">{{ instance.contentType || 'Unknown' }}</span>
+                                        </td>
+                                        <td>{{ getWorkflowDefinitionName(instance.workflowDefinitionId) }}</td>
+                                        <td>
+                                            <span class="badge" :class="getStatusClass(instance.status)">
+                                                {{ instance.status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <small>{{ instance.createdBy || 'System' }}</small>
+                                        </td>
+                                        <td>
+                                            <small>{{ formatDate(instance.created) }}</small>
+                                        </td>
+                                        <td>
+                                            <small>{{ formatDate(instance.lastModified) }}</small>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    v-on:click="editInstance(instance)"
+                                                    title="Edit Instance">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div v-else class="card-body text-center text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>No workflow instances found</p>
+                        <small>Workflow instances will appear here when content is added to workflows</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal fade" :class="{ show: editModal }" :style="{ display: editModal ? 'block' : 'none' }" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-edit"></i>
+                        Edit Workflow Instance
+                    </h5>
+                    <button type="button" class="close" v-on:click="cancelEdit">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" v-if="editingInstance">
+                    <form>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Content ID</label>
+                                    <input type="text" class="form-control" v-model="editingInstance.contentId" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Content Type</label>
+                                    <input type="text" class="form-control" v-model="editingInstance.contentType">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Content Title</label>
+                            <input type="text" class="form-control" v-model="editingInstance.contentTitle">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Status</label>
+                                    <select class="form-control" v-model="editingInstance.status">
+                                        <option value="Active">Active</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                        <option value="OnHold">On Hold</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Created By</label>
+                                    <input type="text" class="form-control" v-model="editingInstance.createdBy" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Metadata</label>
+                            <textarea class="form-control" rows="3" v-model="editingInstance.metadata" placeholder="JSON metadata"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" v-on:click="cancelEdit">Cancel</button>
+                    <button type="button" class="btn btn-primary" v-on:click="updateInstance">
+                        <i class="fas fa-save"></i>
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div v-if="editModal" class="modal-backdrop fade show"></div>
+</div>

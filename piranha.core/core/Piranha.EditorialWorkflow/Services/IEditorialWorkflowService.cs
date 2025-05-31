@@ -33,6 +33,7 @@ public interface IEditorialWorkflowService
     Task<WorkflowInstance> PartialUpdateWorkflowInstanceAsync(Guid workflowInstanceId, WorkflowInstance partialUpdate);
     Task<bool> TransitionWorkflowAsync(Guid instanceId, string targetState);
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByUserAsync();
+    Task<IEnumerable<WorkflowInstance>> GetAllWorkflowInstancesAsync();
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByStateAsync(string state);
     Task<WorkflowInstance> GetWorkflowInstanceByIdAsync(Guid id);
 

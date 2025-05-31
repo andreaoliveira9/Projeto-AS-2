@@ -257,6 +257,25 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         }
     }
 
+    // NEW METHOD - Get all workflow instances
+    public async Task<IEnumerable<WorkflowInstance>> GetAllWorkflowInstancesAsync()
+    {
+        _logger.LogInformation("GetAllWorkflowInstancesAsync: Retrieving all workflow instances");
+        
+        try
+        {
+            var instances = await _workflowInstanceRepository.GetAll();
+            _logger.LogInformation("GetAllWorkflowInstancesAsync: Retrieved {Count} workflow instances", instances?.Count() ?? 0);
+            
+            return instances ?? new List<WorkflowInstance>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetAllWorkflowInstancesAsync: Error retrieving all workflow instances");
+            throw;
+        }
+    }
+
     // Workflow Content Extensions
     public async Task<bool> WorkflowContentExtensionExistsAsync(string contentId)
     {
