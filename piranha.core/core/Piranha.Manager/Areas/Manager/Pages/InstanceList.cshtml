@@ -233,11 +233,19 @@
                         } 
                         return response.json();
                     })
-                    .then(function(updatedInstance) {
-                        // Update the instance in the list
+                    .then(function(result) {
+                        // Extract the updated instance from the response
+                        var updatedInstance = result.workflowInstance;
+                        
+                        // Update the instance in the list with the actual updated data
                         var index = self.instances.findIndex(function(i) { return i.id === updatedInstance.id; });
                         if (index !== -1) {
-                            self.$set(self.instances, index, updatedInstance);
+                            // Update with the latest data from the server
+                            self.$set(self.instances, index, {
+                                // Preserve the enhanced user data from the original instance
+                                ...updatedInstance,
+                                createdByUser: self.instances[index].createdByUser
+                            });
                         }
                         
                         self.transitionModal = false;

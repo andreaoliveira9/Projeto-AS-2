@@ -695,6 +695,120 @@ public class EditorialWorkflowController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Unpublishes content based on content type
+    /// </summary>
+    private async Task<bool> UnpublishContentAsync(string contentId, string contentType)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(contentId) || string.IsNullOrWhiteSpace(contentType))
+            {
+                _logger.LogWarning("Cannot unpublish content: ContentId or ContentType is empty");
+                return false;
+            }
+
+            // Parse contentId to Guid
+            if (!Guid.TryParse(contentId, out var contentGuid))
+            {
+                _logger.LogWarning("Cannot unpublish content: Invalid ContentId format {ContentId}", contentId);
+                return false;
+            }
+
+            switch (contentType.ToLowerInvariant())
+            {
+                case "page":
+                    return await UnpublishPageAsync(contentGuid);
+                
+                case "post":
+                    return await UnpublishPostAsync(contentGuid);
+                
+                default:
+                    _logger.LogWarning("Content unpublishing not supported for content type: {ContentType}", contentType);
+                    return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unpublishing content {ContentId} of type {ContentType}", contentId, contentType);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Unpublishes a page
+    /// </summary>
+    private async Task<bool> UnpublishPageAsync(Guid pageId)
+    {
+        try
+        {
+            // Get the page
+            var page = await _api.Pages.GetByIdAsync(pageId);
+            if (page == null)
+            {
+                _logger.LogWarning("Page not found for unpublishing: {PageId}", pageId);
+                return false;
+            }
+
+            // Check if already unpublished
+            if (!page.Published.HasValue)
+            {
+                _logger.LogInformation("Page {PageId} is already unpublished", pageId);
+                return true;
+            }
+
+            // Set published date to null and save
+            page.Published = null;
+            
+            await _api.Pages.SaveAsync(page);
+            
+            _logger.LogInformation("Successfully unpublished page {PageId}", pageId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unpublishing page {PageId}", pageId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Unpublishes a post
+    /// </summary>
+    private async Task<bool> UnpublishPostAsync(Guid postId)
+    {
+        try
+        {
+            // Get the post
+            var post = await _api.Posts.GetByIdAsync(postId);
+            if (post == null)
+            {
+                _logger.LogWarning("Post not found for unpublishing: {PostId}", postId);
+                return false;
+            }
+
+            // Check if already unpublished
+            if (!post.Published.HasValue)
+            {
+                _logger.LogInformation("Post {PostId} is already unpublished", postId);
+                return true;
+            }
+
+            // Set published date to null and save
+            post.Published = null;
+            
+            await _api.Posts.SaveAsync(post);
+            
+            _logger.LogInformation("Successfully unpublished post {PostId}", postId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unpublishing post {PostId}", postId);
+            return false;
+        }
+    }
+
     [HttpPost("instances")]
     public async Task<ActionResult<WorkflowInstance>> CreateWorkflowInstance(WorkflowInstance instance)
     {
@@ -703,7 +817,7 @@ public class EditorialWorkflowController : ControllerBase
     }
 
     /// <summary>
-    /// Rejects a workflow instance by resetting it to the initial state
+    /// Rejects a workflow instance by resetting it to the initial state and unpublishing content if needed
     /// </summary>
     [HttpPost("instances/{instanceId}/reject")]
     public async Task<ActionResult> RejectWorkflowInstance(Guid instanceId)
@@ -730,6 +844,16 @@ public class EditorialWorkflowController : ControllerBase
             if (initialState == null)
                 return BadRequest("No initial state found for this workflow");
 
+            // Get the current state to check if content needs to be unpublished
+            var currentState = await _workflowService.GetWorkflowStateByIdAsync(workflowInstance.CurrentStateId);
+            bool contentUnpublished = false;
+            
+            // If current state is published or final, and we're going back to initial state, unpublish the content
+            if (currentState != null && (currentState.IsPublished || currentState.IsFinal))
+            {
+                contentUnpublished = await UnpublishContentAsync(workflowInstance.ContentId, workflowInstance.ContentType);
+            }
+
             // Reset the workflow instance to the initial state
             workflowInstance.CurrentStateId = initialState.Id;
             workflowInstance.LastModified = DateTime.UtcNow;
@@ -741,7 +865,8 @@ public class EditorialWorkflowController : ControllerBase
                 action = "rejected",
                 previousStateId = workflowInstance.CurrentStateId,
                 resetToStateId = initialState.Id,
-                performedBy = "current_user" // You might want to get this from the authentication context
+                performedBy = "current_user", // You might want to get this from the authentication context
+                contentUnpublished = contentUnpublished
             };
 
             // Update metadata with rejection log
@@ -753,8 +878,8 @@ public class EditorialWorkflowController : ControllerBase
             // Update the workflow instance
             var updatedInstance = await _workflowService.UpdateWorkflowInstanceAsync(workflowInstance);
 
-            _logger.LogInformation("Workflow instance {InstanceId} rejected and reset to initial state {StateId}", 
-                instanceId, initialState.Id);
+            _logger.LogInformation("Workflow instance {InstanceId} rejected and reset to initial state {StateId}. Content unpublished: {ContentUnpublished}", 
+                instanceId, initialState.Id, contentUnpublished);
 
             return Ok(new
             {
@@ -766,7 +891,8 @@ public class EditorialWorkflowController : ControllerBase
                     id = initialState.Id,
                     name = initialState.Name
                 },
-                updatedInstance = updatedInstance
+                updatedInstance = updatedInstance,
+                contentUnpublished = contentUnpublished
             });
         }
         catch (Exception ex)
