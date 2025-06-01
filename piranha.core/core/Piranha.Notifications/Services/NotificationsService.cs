@@ -55,13 +55,15 @@ public sealed class NotificationsService : INotificationsService
                 FromState = stateChangedEvent.FromState,
                 ToState = stateChangedEvent.ToState,
                 TransitionDescription = stateChangedEvent.transitionDescription,
-                ApprovedBy = stateChangedEvent.approvedBy
+                ReviewedBy = stateChangedEvent.reviewedBy,
+                Approved = stateChangedEvent.approved
             };
 
             // Save the notification to the database
             await _stateChangedNotificationRepository.SaveAsync(notification);
 
-            _logger.LogInformation("Successfully saved workflow state changed notification with Id: {NotificationId}", notification.Id);
+            _logger.LogInformation("Successfully saved workflow state changed notification with Id: {NotificationId}, approved: {Approved}", 
+                notification.Id, notification.Approved);
         }
         catch (Exception ex)
         {

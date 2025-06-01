@@ -44,7 +44,12 @@ public sealed class StateChangedNotification : Notification
     public string TransitionDescription { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the username for quick reference.
+    /// Gets/sets the username who reviewed/performed the action.
     /// </summary>
-    public string ApprovedBy { get; set; } = string.Empty;
+    public string ReviewedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets whether the transition was approved (true) or rejected (false).
+    /// </summary>
+    public bool Approved { get; set; }
 }

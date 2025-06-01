@@ -52,7 +52,8 @@ public sealed class StateChangeRecordRepository : IStateChangeRecordRepository
             existing.FromState = entity.FromState;
             existing.ToState = entity.ToState;
             existing.transitionDescription = entity.transitionDescription;
-            existing.approvedBy = entity.approvedBy;
+            existing.reviewedBy = entity.reviewedBy;
+            existing.approved = entity.approved;
             existing.Timestamp = entity.Timestamp;
             existing.Comments = entity.Comments;
             existing.Success = entity.Success;
@@ -80,7 +81,8 @@ public sealed class StateChangeRecordRepository : IStateChangeRecordRepository
             FromState = model.FromState,
             ToState = model.ToState,
             transitionDescription = model.transitionDescription,
-            approvedBy = model.approvedBy,
+            reviewedBy = model.reviewedBy,
+            approved = model.approved,
             Timestamp = model.Timestamp,
             Comments = model.Comments,
             Success = model.Success,
@@ -98,7 +100,8 @@ public sealed class StateChangeRecordRepository : IStateChangeRecordRepository
             FromState = model.FromState,
             ToState = model.ToState,
             transitionDescription = model.transitionDescription,
-            approvedBy = model.approvedBy,
+            reviewedBy = model.reviewedBy,
+            approved = model.approved,
             Timestamp = model.Timestamp,
             Comments = model.Comments,
             Success = model.Success,

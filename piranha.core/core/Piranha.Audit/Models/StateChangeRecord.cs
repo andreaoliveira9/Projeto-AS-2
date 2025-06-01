@@ -49,9 +49,14 @@ public sealed class StateChangeRecord
     public string transitionDescription { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the username for quick reference.
+    /// Gets/sets the username who reviewed/performed the action.
     /// </summary>
-    public string approvedBy { get; set; } = string.Empty;
+    public string reviewedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets whether the transition was approved (true) or rejected (false).
+    /// </summary>
+    public bool approved { get; set; }
 
     /// <summary>
     /// Gets/sets when the state change occurred.

@@ -181,7 +181,9 @@ public class NotificationsController : ControllerBase
             FromState = notification.FromState,
             ToState = notification.ToState,
             TransitionDescription = notification.TransitionDescription,
-            ApprovedBy = notification.ApprovedBy
+            ReviewedBy = notification.ReviewedBy,
+            ApprovedBy = notification.ReviewedBy, // For backward compatibility
+            Approved = notification.Approved
         };
     }
 }
@@ -227,9 +229,19 @@ public class StateChangedNotificationDto
     public string TransitionDescription { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the username for quick reference.
+    /// Gets/sets the username who reviewed/performed the action.
+    /// </summary>
+    public string ReviewedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets the username for quick reference (backward compatibility).
     /// </summary>
     public string ApprovedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets whether the transition was approved (true) or rejected (false).
+    /// </summary>
+    public bool Approved { get; set; }
 }
 
 /// <summary>
@@ -263,9 +275,19 @@ public class CreateStateChangedNotificationDto
     public string? TransitionDescription { get; set; }
 
     /// <summary>
-    /// Gets/sets the username for quick reference.
+    /// Gets/sets the username who reviewed/performed the action.
+    /// </summary>
+    public string? ReviewedBy { get; set; }
+
+    /// <summary>
+    /// Gets/sets the username for quick reference (backward compatibility).
     /// </summary>
     public string? ApprovedBy { get; set; }
+
+    /// <summary>
+    /// Gets/sets whether the transition was approved (true) or rejected (false).
+    /// </summary>
+    public bool Approved { get; set; }
 }
 
 /// <summary>

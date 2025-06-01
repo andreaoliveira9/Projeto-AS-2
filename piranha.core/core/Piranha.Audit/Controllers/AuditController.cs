@@ -117,14 +117,17 @@ public class AuditController : ControllerBase
                 ContentId = contentId,
                 TotalChanges = recordsList.Count,
                 LastChange = recordsList.FirstOrDefault()?.Timestamp,
-                LastChangedBy = recordsList.FirstOrDefault()?.approvedBy,
+                LastReviewedBy = recordsList.FirstOrDefault()?.reviewedBy,
+                LastChangedBy = recordsList.FirstOrDefault()?.reviewedBy, // For backward compatibility
                 CurrentState = recordsList.FirstOrDefault()?.ToState,
                 SuccessfulChanges = recordsList.Count(r => r.Success),
-                FailedChanges = recordsList.Count(r => !r.Success)
+                FailedChanges = recordsList.Count(r => !r.Success),
+                ApprovedChanges = recordsList.Count(r => r.approved && r.Success),
+                RejectedChanges = recordsList.Count(r => !r.approved && r.Success)
             };
 
-            _logger.LogInformation("Generated audit summary for content {ContentId}: {TotalChanges} total changes", 
-                contentId, summary.TotalChanges);
+            _logger.LogInformation("Generated audit summary for content {ContentId}: {TotalChanges} total changes, {ApprovedChanges} approved, {RejectedChanges} rejected", 
+                contentId, summary.TotalChanges, summary.ApprovedChanges, summary.RejectedChanges);
             
             return Ok(summary);
         }
@@ -150,7 +153,9 @@ public class AuditController : ControllerBase
             FromState = record.FromState,
             ToState = record.ToState,
             transitionDescription = record.transitionDescription,
-            Username = record.approvedBy,
+            Username = record.reviewedBy, // Map reviewedBy to Username for backward compatibility
+            ReviewedBy = record.reviewedBy,
+            Approved = record.approved,
             Timestamp = record.Timestamp,
             Comments = record.Comments,
             Success = record.Success,
@@ -195,9 +200,19 @@ public class StateChangeRecordDto
     public string transitionDescription { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the username for quick reference.
+    /// Gets/sets the username for quick reference (backward compatibility).
     /// </summary>
     public string Username { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets the username who reviewed/performed the action.
+    /// </summary>
+    public string ReviewedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets whether the transition was approved (true) or rejected (false).
+    /// </summary>
+    public bool Approved { get; set; }
 
     /// <summary>
     /// Gets/sets when the state change occurred.
@@ -241,9 +256,14 @@ public class AuditSummaryDto
     public DateTime? LastChange { get; set; }
 
     /// <summary>
-    /// Gets/sets who made the last change.
+    /// Gets/sets who made the last change (backward compatibility).
     /// </summary>
     public string? LastChangedBy { get; set; }
+
+    /// <summary>
+    /// Gets/sets who reviewed the last change.
+    /// </summary>
+    public string? LastReviewedBy { get; set; }
 
     /// <summary>
     /// Gets/sets the current state.
@@ -259,4 +279,14 @@ public class AuditSummaryDto
     /// Gets/sets the number of failed changes.
     /// </summary>
     public int FailedChanges { get; set; }
+
+    /// <summary>
+    /// Gets/sets the number of approved changes.
+    /// </summary>
+    public int ApprovedChanges { get; set; }
+
+    /// <summary>
+    /// Gets/sets the number of rejected changes.
+    /// </summary>
+    public int RejectedChanges { get; set; }
 }

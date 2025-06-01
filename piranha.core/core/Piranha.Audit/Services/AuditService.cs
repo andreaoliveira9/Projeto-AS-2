@@ -54,7 +54,8 @@ public sealed class AuditService : IAuditService
                 FromState = stateChangedEvent.FromState,
                 ToState = stateChangedEvent.ToState,
                 transitionDescription = stateChangedEvent.transitionDescription,
-                approvedBy = stateChangedEvent.approvedBy,
+                reviewedBy = stateChangedEvent.reviewedBy,
+                approved = stateChangedEvent.approved,
                 Timestamp = stateChangedEvent.Timestamp,
                 Comments = stateChangedEvent.Comments,
                 Success = stateChangedEvent.Success,
@@ -63,8 +64,8 @@ public sealed class AuditService : IAuditService
 
             await _stateChangeRecordRepository.SaveAsync(stateChangeRecord);
             
-            _logger.LogInformation("State change logged for content {ContentId} from {FromState} to {ToState} by user {Username}",
-                stateChangedEvent.ContentId, stateChangedEvent.FromState, stateChangedEvent.ToState, stateChangedEvent.approvedBy);
+            _logger.LogInformation("State change logged for content {ContentId} from {FromState} to {ToState} by user {Username}, approved: {Approved}",
+                stateChangedEvent.ContentId, stateChangedEvent.FromState, stateChangedEvent.ToState, stateChangedEvent.reviewedBy, stateChangedEvent.approved);
         }
         catch (Exception ex)
         {

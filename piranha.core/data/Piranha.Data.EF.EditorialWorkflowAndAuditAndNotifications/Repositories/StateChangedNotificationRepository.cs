@@ -54,7 +54,8 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
             FromState = n.FromState,
             ToState = n.ToState,
             TransitionDescription = n.TransitionDescription,
-            ApprovedBy = n.ApprovedBy
+            ReviewedBy = n.ReviewedBy,
+            Approved = n.Approved
         });
     }
 
@@ -82,7 +83,8 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
             FromState = notification.FromState,
             ToState = notification.ToState,
             TransitionDescription = notification.TransitionDescription,
-            ApprovedBy = notification.ApprovedBy
+            ReviewedBy = notification.ReviewedBy,
+            Approved = notification.Approved
         };
     }
 
@@ -107,7 +109,8 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
                 FromState = model.FromState,
                 ToState = model.ToState,
                 TransitionDescription = model.TransitionDescription,
-                ApprovedBy = model.ApprovedBy
+                ReviewedBy = model.ReviewedBy,
+                Approved = model.Approved
             };
             await _db.Set<Data.Notifications.StateChangedNotification>().AddAsync(notification);
         }
@@ -119,7 +122,8 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
             notification.FromState = model.FromState;
             notification.ToState = model.ToState;
             notification.TransitionDescription = model.TransitionDescription;
-            notification.ApprovedBy = model.ApprovedBy;
+            notification.ReviewedBy = model.ReviewedBy;
+            notification.Approved = model.Approved;
             _db.Set<Data.Notifications.StateChangedNotification>().Update(notification);
         }
 

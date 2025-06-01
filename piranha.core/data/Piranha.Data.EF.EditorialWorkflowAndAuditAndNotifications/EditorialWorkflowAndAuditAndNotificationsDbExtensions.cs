@@ -195,7 +195,8 @@ public static class EditorialWorkflowAndAuditAndNotificationsDbExtensions
         stateChangeRecord.Property(s => s.FromState).IsRequired().HasMaxLength(100);
         stateChangeRecord.Property(s => s.ToState).IsRequired().HasMaxLength(100);
         stateChangeRecord.Property(s => s.transitionDescription).IsRequired().HasMaxLength(500);
-        stateChangeRecord.Property(s => s.approvedBy).IsRequired().HasMaxLength(256);
+        stateChangeRecord.Property(s => s.reviewedBy).IsRequired().HasMaxLength(256);
+        stateChangeRecord.Property(s => s.approved).IsRequired().HasDefaultValue(true);
         stateChangeRecord.Property(s => s.Timestamp).IsRequired();
         stateChangeRecord.Property(s => s.Comments).HasMaxLength(1000);
         stateChangeRecord.Property(s => s.Success).IsRequired().HasDefaultValue(true);
@@ -204,7 +205,8 @@ public static class EditorialWorkflowAndAuditAndNotificationsDbExtensions
         // Indexes for better query performance
         stateChangeRecord.HasIndex(s => s.ContentId);
         stateChangeRecord.HasIndex(s => new { s.ContentId, s.Timestamp });
-        stateChangeRecord.HasIndex(s => s.approvedBy);
+        stateChangeRecord.HasIndex(s => s.reviewedBy);
+        stateChangeRecord.HasIndex(s => s.approved);
         stateChangeRecord.HasIndex(s => s.Timestamp);
         stateChangeRecord.HasIndex(s => new { s.FromState, s.ToState });
         stateChangeRecord.HasIndex(s => s.Success);
@@ -230,12 +232,14 @@ public static class EditorialWorkflowAndAuditAndNotificationsDbExtensions
         stateChangedNotification.Property(n => n.FromState).IsRequired().HasMaxLength(100);
         stateChangedNotification.Property(n => n.ToState).IsRequired().HasMaxLength(100);
         stateChangedNotification.Property(n => n.TransitionDescription).IsRequired().HasMaxLength(500);
-        stateChangedNotification.Property(n => n.ApprovedBy).IsRequired().HasMaxLength(256);
+        stateChangedNotification.Property(n => n.ReviewedBy).IsRequired().HasMaxLength(256);
+        stateChangedNotification.Property(n => n.Approved).IsRequired().HasDefaultValue(true);
         
         // Indexes for StateChangedNotification
         stateChangedNotification.HasIndex(n => n.ContentId);
         stateChangedNotification.HasIndex(n => new { n.ContentId, n.Timestamp });
-        stateChangedNotification.HasIndex(n => n.ApprovedBy);
+        stateChangedNotification.HasIndex(n => n.ReviewedBy);
+        stateChangedNotification.HasIndex(n => n.Approved);
         stateChangedNotification.HasIndex(n => new { n.FromState, n.ToState });
     }
 }

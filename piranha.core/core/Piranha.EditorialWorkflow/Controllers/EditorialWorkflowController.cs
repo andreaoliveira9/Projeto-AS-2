@@ -465,9 +465,9 @@ public class EditorialWorkflowController : ControllerBase
                         allowedRoles = jsonRoles?.Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r.Trim()).ToList() ?? new List<string>();
                         _logger.LogInformation("Parsed AllowedRoles from JSON array format");
                     }
-                    catch (System.Text.Json.JsonException ex)
+                    catch (System.Text.Json.JsonException)
                     {
-                        _logger.LogWarning(ex, "Failed to parse AllowedRoles as JSON, falling back to comma-separated parsing");
+                        _logger.LogWarning("Failed to parse AllowedRoles as JSON, falling back to comma-separated parsing");
                         // Fallback to comma-separated parsing
                         allowedRoles = transitionRule.AllowedRoles.Split(',', StringSplitOptions.RemoveEmptyEntries)
                             .Select(r => r.Trim())
@@ -532,7 +532,6 @@ public class EditorialWorkflowController : ControllerBase
             _logger.LogInformation("Transition will be performed by user: {UserName} ({UserId})",
                 user.UserName ?? user.Email, user.Id);
 
-            
             // Add transition comment to metadata if provided
             if (!string.IsNullOrWhiteSpace(request.Comment))
             {
@@ -564,6 +563,13 @@ public class EditorialWorkflowController : ControllerBase
                 contentPublished = await PublishContentAsync(workflowInstance.ContentId, workflowInstance.ContentType);
             }
 
+            // If current state is published or final, and we're going back to initial state, unpublish the content
+            bool contentUnpublished = false;
+            if (fromState != null && (fromState.IsPublished || fromState.IsFinal) && targetState != null && !targetState.IsPublished)
+            {
+              contentUnpublished = await UnpublishContentAsync(workflowInstance.ContentId, workflowInstance.ContentType);
+            }
+
             // Send audit message to RabbitMQ on successful transition
             bool messagePublished = false;
             try
@@ -571,15 +577,16 @@ public class EditorialWorkflowController : ControllerBase
                 // Parse contentId to Guid for the message
                 if (Guid.TryParse(workflowInstance.ContentId, out var contentGuid))
                 {
-                    // Create the audit event message using the new simplified structure
+                    // Create the audit event message using the updated structure
                     var stateChangedEvent = new WorkflowStateChangedEvent
                     {
                         ContentId = contentGuid,
                         ContentName = workflowInstance.ContentTitle ?? "Unknown Content",
                         FromState = fromState.Name,
                         ToState = targetState.Name,
-                        transitionDescription = transitionRule.Description ?? "Content need review",
-                        approvedBy = user.UserName ?? user.Email ?? "Unknown",
+                        transitionDescription = transitionRule.Description ?? "Content approved for next state",
+                        reviewedBy = user.UserName ?? user.Email ?? "Unknown",
+                        approved = true, // Normal transitions are considered approvals
                         Timestamp = DateTime.UtcNow,
                         Comments = request.Comment,
                         Success = true,
@@ -868,10 +875,10 @@ public class EditorialWorkflowController : ControllerBase
     }
 
     /// <summary>
-    /// Rejects a workflow instance by resetting it to the initial state and unpublishing content if needed
+    /// Rejects a workflow instance by resetting it to the initial state, unpublishing content if needed, and sending MQ message
     /// </summary>
     [HttpPost("instances/{instanceId}/reject")]
-    public async Task<ActionResult> RejectWorkflowInstance(Guid instanceId)
+    public async Task<ActionResult> RejectWorkflowInstance(Guid instanceId, [FromBody] WorkflowTransitionRequest request = null)
     {
         try
         {
@@ -891,11 +898,11 @@ public class EditorialWorkflowController : ControllerBase
             // Get all states for this workflow definition
             var workflowStates = await _workflowService.GetWorkflowStatesByDefinitionAsync(workflowInstance.WorkflowDefinitionId);
             var initialState = workflowStates.FirstOrDefault(s => s.IsInitial);
-            
+
             if (initialState == null)
                 return BadRequest("No initial state found for this workflow");
 
-            // Get the current state to check if content needs to be unpublished
+            // Get the current state to check if content needs to be unpublished and for messaging
             var currentState = await _workflowService.GetWorkflowStateByIdAsync(workflowInstance.CurrentStateId);
             bool contentUnpublished = false;
 
@@ -905,32 +912,83 @@ public class EditorialWorkflowController : ControllerBase
                 contentUnpublished = await UnpublishContentAsync(workflowInstance.ContentId, workflowInstance.ContentType);
             }
 
+            // Get current user for logging and messaging
+            var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
+            string userName = user?.UserName ?? user?.Email ?? "System";
+
             // Reset the workflow instance to the initial state
             workflowInstance.CurrentStateId = initialState.Id;
             workflowInstance.LastModified = DateTime.UtcNow;
-            
+
             // Add rejection metadata
             var rejectionLog = new
             {
                 timestamp = DateTime.UtcNow,
                 action = "rejected",
-                previousStateId = workflowInstance.CurrentStateId,
+                previousStateId = currentState?.Id,
                 resetToStateId = initialState.Id,
-                performedBy = "current_user", // You might want to get this from the authentication context
-                contentUnpublished = contentUnpublished
+                performedBy = userName,
+                contentUnpublished = contentUnpublished,
+                comment = request?.Comment
             };
 
             // Update metadata with rejection log
             var metadata = string.IsNullOrWhiteSpace(workflowInstance.Metadata) ? "{}" : workflowInstance.Metadata;
-            workflowInstance.Metadata = metadata.TrimEnd('}') + 
-                (metadata == "{}" ? "" : ",") + 
+            workflowInstance.Metadata = metadata.TrimEnd('}') +
+                (metadata == "{}" ? "" : ",") +
                 $"\"lastRejection\":{System.Text.Json.JsonSerializer.Serialize(rejectionLog)}}}";
 
             // Update the workflow instance
             var updatedInstance = await _workflowService.UpdateWorkflowInstanceAsync(workflowInstance);
 
-            _logger.LogInformation("Workflow instance {InstanceId} rejected and reset to initial state {StateId}. Content unpublished: {ContentUnpublished}",
-                instanceId, initialState.Id, contentUnpublished);
+            // Send rejection message to RabbitMQ
+            bool messagePublished = false;
+            try
+            {
+                // Parse contentId to Guid for the message
+                if (Guid.TryParse(workflowInstance.ContentId, out var contentGuid))
+                {
+                    // Create the audit event message for rejection
+                    var stateChangedEvent = new WorkflowStateChangedEvent
+                    {
+                        ContentId = contentGuid,
+                        ContentName = workflowInstance.ContentTitle ?? "Unknown Content",
+                        FromState = currentState?.Name ?? "Unknown",
+                        ToState = initialState.Name,
+                        transitionDescription = "Content rejected and reset to initial state",
+                        reviewedBy = userName,
+                        approved = false, // Rejection is not an approval
+                        Timestamp = DateTime.UtcNow,
+                        Comments = request?.Comment ?? "Content rejected",
+                        Success = true,
+                        ErrorMessage = null
+                    };
+
+                    // Publish the message to RabbitMQ
+                    messagePublished = await _messagePublisher.PublishStateChangedEventAsync(stateChangedEvent);
+
+                    if (messagePublished)
+                    {
+                        _logger.LogInformation("Successfully published workflow rejection message for instance {InstanceId}", instanceId);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to publish workflow rejection message for instance {InstanceId}", instanceId);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Could not parse ContentId {ContentId} as Guid for rejection message publishing", workflowInstance.ContentId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error publishing workflow rejection message for instance {InstanceId}", instanceId);
+                // Don't fail the rejection if message publishing fails
+            }
+
+            _logger.LogInformation("Workflow instance {InstanceId} rejected and reset to initial state {StateId}. Content unpublished: {ContentUnpublished}, Message published: {MessagePublished}",
+                instanceId, initialState.Id, contentUnpublished, messagePublished);
 
             return Ok(new
             {
@@ -943,7 +1001,8 @@ public class EditorialWorkflowController : ControllerBase
                     name = initialState.Name
                 },
                 updatedInstance = updatedInstance,
-                contentUnpublished = contentUnpublished
+                contentUnpublished = contentUnpublished,
+                messagePublished = messagePublished
             });
         }
         catch (Exception ex)
