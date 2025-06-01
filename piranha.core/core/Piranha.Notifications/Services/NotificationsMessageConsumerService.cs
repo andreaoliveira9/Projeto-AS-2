@@ -195,8 +195,8 @@ public sealed class NotificationsMessageConsumerService : BackgroundService
             if (stateChangedEvent != null)
             {
                 await notificationsService.ProcessWorkflowStateChangedEventAsync(stateChangedEvent, cancellationToken);
-                _logger.LogDebug("Successfully processed workflow state changed event {EventId}",
-                    stateChangedEvent.EventId);
+                _logger.LogDebug("Successfully processed workflow state changed event {ContentId}",
+                    stateChangedEvent.ContentId);
             }
             else
             {
