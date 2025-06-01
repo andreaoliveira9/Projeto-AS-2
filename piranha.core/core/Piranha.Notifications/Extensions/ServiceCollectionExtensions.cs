@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 using Piranha;
 using Piranha.Notifications.Configuration;
 using Piranha.Notifications.Services;
-using Piranha.Notifications.Repositories;
+using Piranha.Notifications.Controllers;
 
 namespace Piranha.Notifications.Extensions;
 
@@ -46,9 +46,9 @@ public static class ServiceCollectionExtensions
         // Register background service for consuming audit messages from RabbitMQ
         services.AddHostedService<NotificationsMessageConsumerService>();
 
-        /* services.AddControllers()
-            .AddApplicationPart(typeof(AuditController).Assembly)
-            .AddControllersAsServices(); */
+        services.AddControllers()
+            .AddApplicationPart(typeof(NotificationsController).Assembly)
+            .AddControllersAsServices();
 
         return services;
     }
