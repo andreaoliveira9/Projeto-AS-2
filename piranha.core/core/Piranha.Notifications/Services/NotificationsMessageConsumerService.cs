@@ -195,8 +195,8 @@ public sealed class NotificationsMessageConsumerService : BackgroundService
             if (stateChangedEvent != null)
             {
                 await notificationsService.ProcessWorkflowStateChangedEventAsync(stateChangedEvent, cancellationToken);
-                _logger.LogDebug("Successfully processed workflow state changed event {EventId}",
-                    stateChangedEvent.EventId);
+                _logger.LogDebug("Successfully processed workflow state changed event {ContentId}",
+                    stateChangedEvent.ContentId);
             }
             else
             {
@@ -205,7 +205,7 @@ public sealed class NotificationsMessageConsumerService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing audit message: {Message}", 
+            _logger.LogError(ex, "Error processing notification message: {Message}", 
                 message?.Length > 200 ? message[..200] + "..." : message);
             throw;
         }
