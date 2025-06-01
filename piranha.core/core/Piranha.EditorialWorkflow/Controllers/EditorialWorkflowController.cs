@@ -14,11 +14,16 @@ public class EditorialWorkflowController : ControllerBase
 {
     private readonly IEditorialWorkflowService _workflowService;
     private readonly ILogger<EditorialWorkflowController> _logger;
+    private readonly IApi _api;
 
-    public EditorialWorkflowController(IEditorialWorkflowService workflowService, ILogger<EditorialWorkflowController> logger)
+    public EditorialWorkflowController(
+        IEditorialWorkflowService workflowService, 
+        ILogger<EditorialWorkflowController> logger,
+        IApi api)
     {
         _workflowService = workflowService;
         _logger = logger;
+        _api = api;
     }
 
     #region Request Models
@@ -29,6 +34,20 @@ public class EditorialWorkflowController : ControllerBase
         public Guid WorkflowDefinitionId { get; set; }
         public string ContentType { get; set; }
         public string ContentTitle { get; set; }
+    }
+
+    public class WorkflowTransitionRequest
+    {
+        public Guid TransitionRuleId { get; set; }
+        public string Comment { get; set; }
+    }
+
+    public class WorkflowInstanceTransitionsResponse
+    {
+        public Guid WorkflowInstanceId { get; set; }
+        public WorkflowInstance WorkflowInstance { get; set; }
+        public WorkflowState CurrentState { get; set; }
+        public IList<TransitionRule> AvailableTransitions { get; set; }
     }
     
     #endregion
@@ -118,6 +137,263 @@ public class EditorialWorkflowController : ControllerBase
         return Ok(instance);
     }
 
+    /// <summary>
+    /// Gets a workflow instance with its current state and available transitions
+    /// </summary>
+    [HttpGet("workflow-instances/{workflowInstanceId}/transitions")]
+    public async Task<ActionResult<WorkflowInstanceTransitionsResponse>> GetWorkflowInstanceTransitions(Guid workflowInstanceId)
+    {
+        try
+        {
+            if (workflowInstanceId == Guid.Empty)
+                return BadRequest("WorkflowInstanceId is required");
+
+            // Get the workflow instance
+            var workflowInstance = await _workflowService.GetWorkflowInstanceByIdAsync(workflowInstanceId);
+            if (workflowInstance == null)
+                return NotFound("Workflow instance not found");
+
+            // Get the current state with outgoing transitions
+            var currentState = await _workflowService.GetWorkflowStateByIdAsync(workflowInstance.CurrentStateId);
+            if (currentState == null)
+                return NotFound("Current state not found");
+
+            // Get all outgoing transitions for the current state
+            var outgoingTransitions = await _workflowService.GetTransitionRulesByDefinitionAsync(workflowInstance.WorkflowDefinitionId);
+            var availableTransitions = outgoingTransitions
+                .Where(t => t.FromStateId == currentState.Id && t.IsActive)
+                .OrderBy(t => t.SortOrder)
+                .ToList();
+
+            var response = new WorkflowInstanceTransitionsResponse
+            {
+                WorkflowInstanceId = workflowInstanceId,
+                WorkflowInstance = workflowInstance,
+                CurrentState = currentState,
+                AvailableTransitions = availableTransitions
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting workflow instance transitions for {WorkflowInstanceId}", workflowInstanceId);
+            return StatusCode(500, "An error occurred while getting workflow instance transitions");
+        }
+    }
+
+    /// <summary>
+    /// Performs a state transition on a workflow instance and publishes content if transitioning to a published or final state
+    /// </summary>
+    [HttpPost("workflow-instances/{workflowInstanceId}/transition")]
+    public async Task<ActionResult<WorkflowInstance>> PerformWorkflowTransition(Guid workflowInstanceId, [FromBody] WorkflowTransitionRequest request)
+    {
+        try
+        {
+            if (workflowInstanceId == Guid.Empty)
+                return BadRequest("WorkflowInstanceId is required");
+
+            if (request == null || request.TransitionRuleId == Guid.Empty)
+                return BadRequest("TransitionRuleId is required");
+
+            // Get the workflow instance
+            var workflowInstance = await _workflowService.GetWorkflowInstanceByIdAsync(workflowInstanceId);
+            if (workflowInstance == null)
+                return NotFound("Workflow instance not found");
+
+            // Get the transition rule
+            var transitionRule = await _workflowService.GetTransitionRuleByIdAsync(request.TransitionRuleId);
+            if (transitionRule == null)
+                return NotFound("Transition rule not found");
+
+            // Validate that the transition is valid from the current state
+            if (transitionRule.FromStateId != workflowInstance.CurrentStateId)
+                return BadRequest("Invalid transition: the transition rule does not start from the current state");
+
+            // Check if the transition is active
+            if (!transitionRule.IsActive)
+                return BadRequest("Transition rule is not active");
+
+            // Validate comment requirement
+            if (transitionRule.RequiresComment && string.IsNullOrWhiteSpace(request.Comment))
+                return BadRequest("This transition requires a comment");
+
+            // Get the target state to check if it requires publishing
+            var targetState = await _workflowService.GetWorkflowStateByIdAsync(transitionRule.ToStateId);
+            if (targetState == null)
+                return BadRequest("Target state not found");
+
+            // Perform the transition - update the current state
+            workflowInstance.CurrentStateId = transitionRule.ToStateId;
+            workflowInstance.LastModified = DateTime.UtcNow;
+
+            // Add transition comment to metadata if provided
+            if (!string.IsNullOrWhiteSpace(request.Comment))
+            {
+                var transitionLog = new
+                {
+                    timestamp = DateTime.UtcNow,
+                    fromStateId = transitionRule.FromStateId,
+                    toStateId = transitionRule.ToStateId,
+                    transitionRuleId = transitionRule.Id,
+                    comment = request.Comment,
+                    performedBy = "current_user" // You might want to get this from the authentication context
+                };
+
+                // Update metadata with transition log
+                var metadata = string.IsNullOrWhiteSpace(workflowInstance.Metadata) ? "{}" : workflowInstance.Metadata;
+                // Simple append - in production you might want to parse JSON and add to an array
+                workflowInstance.Metadata = metadata.TrimEnd('}') + 
+                    (metadata == "{}" ? "" : ",") + 
+                    $"\"lastTransition\":{System.Text.Json.JsonSerializer.Serialize(transitionLog)}}}";
+            }
+
+            // Update the workflow instance
+            var updatedInstance = await _workflowService.UpdateWorkflowInstanceAsync(workflowInstance);
+
+            // Check if we need to publish the content
+            bool contentPublished = false;
+            if (targetState.IsPublished || targetState.IsFinal)
+            {
+                contentPublished = await PublishContentAsync(workflowInstance.ContentId, workflowInstance.ContentType);
+            }
+
+            _logger.LogInformation("Workflow transition performed: Instance {InstanceId} moved from state {FromStateId} to {ToStateId}. Content published: {ContentPublished}", 
+                workflowInstanceId, transitionRule.FromStateId, transitionRule.ToStateId, contentPublished);
+
+            return Ok(new
+            {
+                workflowInstance = updatedInstance,
+                contentPublished = contentPublished,
+                targetState = new
+                {
+                    targetState.Name,
+                    targetState.IsPublished,
+                    targetState.IsFinal
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error performing workflow transition for instance {WorkflowInstanceId}", workflowInstanceId);
+            return StatusCode(500, "An error occurred while performing the workflow transition");
+        }
+    }
+
+    /// <summary>
+    /// Publishes content based on content type
+    /// </summary>
+    private async Task<bool> PublishContentAsync(string contentId, string contentType)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(contentId) || string.IsNullOrWhiteSpace(contentType))
+            {
+                _logger.LogWarning("Cannot publish content: ContentId or ContentType is empty");
+                return false;
+            }
+
+            // Parse contentId to Guid
+            if (!Guid.TryParse(contentId, out var contentGuid))
+            {
+                _logger.LogWarning("Cannot publish content: Invalid ContentId format {ContentId}", contentId);
+                return false;
+            }
+
+            switch (contentType.ToLowerInvariant())
+            {
+                case "page":
+                    return await PublishPageAsync(contentGuid);
+                
+                case "post":
+                    return await PublishPostAsync(contentGuid);
+                
+                default:
+                    _logger.LogWarning("Content publishing not supported for content type: {ContentType}", contentType);
+                    return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error publishing content {ContentId} of type {ContentType}", contentId, contentType);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Publishes a page
+    /// </summary>
+    private async Task<bool> PublishPageAsync(Guid pageId)
+    {
+        try
+        {
+            // Get the page
+            var page = await _api.Pages.GetByIdAsync(pageId);
+            if (page == null)
+            {
+                _logger.LogWarning("Page not found for publishing: {PageId}", pageId);
+                return false;
+            }
+
+            // Check if already published
+            if (page.Published.HasValue)
+            {
+                _logger.LogInformation("Page {PageId} is already published", pageId);
+                return true;
+            }
+
+            // Set published date and save
+            page.Published = DateTime.UtcNow;
+            
+            await _api.Pages.SaveAsync(page);
+            
+            _logger.LogInformation("Successfully published page {PageId}", pageId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error publishing page {PageId}", pageId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Publishes a post
+    /// </summary>
+    private async Task<bool> PublishPostAsync(Guid postId)
+    {
+        try
+        {
+            // Get the post
+            var post = await _api.Posts.GetByIdAsync(postId);
+            if (post == null)
+            {
+                _logger.LogWarning("Post not found for publishing: {PostId}", postId);
+                return false;
+            }
+
+            // Check if already published
+            if (post.Published.HasValue)
+            {
+                _logger.LogInformation("Post {PostId} is already published", postId);
+                return true;
+            }
+
+            // Set published date and save
+            post.Published = DateTime.UtcNow;
+            
+            await _api.Posts.SaveAsync(post);
+            
+            _logger.LogInformation("Successfully published post {PostId}", postId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error publishing post {PostId}", postId);
+            return false;
+        }
+    }
+
     [HttpPost("instances")]
     public async Task<ActionResult<WorkflowInstance>> CreateWorkflowInstance(WorkflowInstance instance)
     {
@@ -178,8 +454,57 @@ public class EditorialWorkflowController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error creating workflow instance with content");
             return StatusCode(500, "An error occurred while creating the workflow instance");
         }
+    }
+
+    /// <summary>
+    /// Assigns a workflow to a page - Simple endpoint for testing
+    /// </summary>
+    [HttpPost("assign-workflow-to-page/{pageId}")]
+    public async Task<IActionResult> AssignWorkflowToPage(Guid pageId, [FromBody] AssignWorkflowRequest request)
+    {
+        try
+        {
+            if (pageId == Guid.Empty)
+                return BadRequest("PageId is required");
+
+            if (request == null || request.WorkflowDefinitionId == Guid.Empty)
+                return BadRequest("WorkflowDefinitionId is required");
+
+            // Get page information
+            var page = await _api.Pages.GetByIdAsync(pageId);
+            if (page == null)
+                return NotFound("Page not found");
+
+            // Create workflow instance for the page
+            var workflowInstance = await _workflowService.CreateWorkflowInstanceWithContentAsync(
+                pageId.ToString(),
+                request.WorkflowDefinitionId,
+                "page",
+                page.Title);
+
+            return Ok(new
+            {
+                success = true,
+                message = "Workflow assigned to page successfully",
+                workflowInstanceId = workflowInstance.Id,
+                pageId = pageId,
+                pageTitle = page.Title,
+                workflowDefinitionId = request.WorkflowDefinitionId
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning workflow to page {PageId}", pageId);
+            return StatusCode(500, "An error occurred while assigning workflow to page");
+        }
+    }
+
+    public class AssignWorkflowRequest
+    {
+        public Guid WorkflowDefinitionId { get; set; }
     }
 
     #endregion

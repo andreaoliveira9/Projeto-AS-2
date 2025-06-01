@@ -338,12 +338,30 @@ public class EditorialWorkflowService : IEditorialWorkflowService
     
     public async Task<WorkflowDefinition> CreateWorkflowDefinitionAsync(WorkflowDefinition definition) 
     { 
+        // Get current user or set default
+        var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
+        string userId = user?.Id.ToString() ?? "system";
+        
+        // Set required fields
+        definition.CreatedBy = definition.CreatedBy ?? userId;
+        definition.LastModifiedBy = definition.LastModifiedBy ?? userId;
+        definition.Created = definition.Created == default ? DateTime.UtcNow : definition.Created;
+        definition.LastModified = DateTime.UtcNow;
+        
         await _workflowDefinitionRepository.Save(definition); 
         return definition; 
     }
     
     public async Task<WorkflowDefinition> UpdateWorkflowDefinitionAsync(WorkflowDefinition definition) 
     { 
+        // Get current user or set default
+        var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
+        string userId = user?.Id.ToString() ?? "system";
+        
+        // Set required fields for update
+        definition.LastModifiedBy = userId;
+        definition.LastModified = DateTime.UtcNow;
+        
         await _workflowDefinitionRepository.Save(definition); 
         return definition; 
     }

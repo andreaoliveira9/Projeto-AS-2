@@ -17,8 +17,14 @@
                 instances: [],
                 contentExtensions: {},
                 workflowDefinitions: {},
+                workflowStates: {},
                 editingInstance: null,
                 editModal: false,
+                transitionModal: false,
+                transitioningInstance: null,
+                availableTransitions: [],
+                selectedTransition: null,
+                transitionComment: '',
                 error: null,
                 statusMap: {
                     1: 'Active',
@@ -76,12 +82,47 @@
                             self.$set(self.workflowDefinitions, def.id, def);
                         });
                         console.log('Loaded workflow definitions:', self.workflowDefinitions);
-                        self.loading = false;
+                        self.loadWorkflowStates();
                     })
                     .catch(function(error) {
                         console.error('Error loading workflow definitions:', error);
                         self.loading = false;
                     });
+                },
+                
+                // Load workflow states for display names
+                loadWorkflowStates: function() {
+                    var self = this;
+                    
+                    // Get unique workflow definition IDs from instances
+                    var definitionIds = [...new Set(self.instances.map(i => i.workflowDefinitionId))];
+                    
+                    var statePromises = definitionIds.map(function(defId) {
+                        return fetch('/api/workflow/definitions/' + defId + '/states', {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        })
+                        .then(function(response) {
+                            return response.json();
+                        })
+                        .then(function(states) {
+                            states.forEach(function(state) {
+                                self.$set(self.workflowStates, state.id, state);
+                            });
+                        });
+                    });
+                    
+                    Promise.all(statePromises)
+                        .then(function() {
+                            console.log('Loaded workflow states:', self.workflowStates);
+                            self.loading = false;
+                        })
+                        .catch(function(error) {
+                            console.error('Error loading workflow states:', error);
+                            self.loading = false;
+                        });
                 },
                 
                 // Open edit modal
@@ -90,6 +131,111 @@
                     // Convert status number to string for editing
                     this.editingInstance.statusString = this.getStatusString(instance.status);
                     this.editModal = true;
+                },
+                
+                // Open transition modal
+                openTransitionModal: function(instance) {
+                    var self = this;
+                    self.transitioningInstance = instance;
+                    self.selectedTransition = null;
+                    self.transitionComment = '';
+                    self.availableTransitions = [];
+                    
+                    // Fetch available transitions
+                    fetch('/api/workflow/workflow-instances/' + instance.id + '/transitions', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to load transitions');
+                        }
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        self.availableTransitions = data.availableTransitions || [];
+                        self.transitionModal = true;
+                    })
+                    .catch(function(error) {
+                        console.error('Error loading transitions:', error);
+                        piranha.notifications.push({
+                            body: "Failed to load available transitions",
+                            type: "danger",
+                            hide: true
+                        });
+                    });
+                },
+                
+                // Perform transition
+                performTransition: function() {
+                    var self = this;
+                    
+                    if (!self.selectedTransition) {
+                        piranha.notifications.push({
+                            body: "Please select a transition",
+                            type: "warning",
+                            hide: true
+                        });
+                        return;
+                    }
+                    
+                    // Check if comment is required
+                    var transition = self.availableTransitions.find(t => t.id === self.selectedTransition);
+                    if (transition && transition.requiresComment && !self.transitionComment.trim()) {
+                        piranha.notifications.push({
+                            body: "This transition requires a comment",
+                            type: "warning",
+                            hide: true
+                        });
+                        return;
+                    }
+                    
+                    var requestBody = {
+                        transitionRuleId: self.selectedTransition,
+                        comment: self.transitionComment || null
+                    };
+                    
+                    fetch('/api/workflow/workflow-instances/' + self.transitioningInstance.id + '/transition', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody)
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to perform transition');
+                        }
+                        return response.json();
+                    })
+                    .then(function(updatedInstance) {
+                        // Update the instance in the list
+                        var index = self.instances.findIndex(function(i) { return i.id === updatedInstance.id; });
+                        if (index !== -1) {
+                            self.$set(self.instances, index, updatedInstance);
+                        }
+                        
+                        self.transitionModal = false;
+                        self.transitioningInstance = null;
+                        self.selectedTransition = null;
+                        self.transitionComment = '';
+                        
+                        piranha.notifications.push({
+                            body: "Workflow transition completed successfully",
+                            type: "success",
+                            hide: true
+                        });
+                    })
+                    .catch(function(error) {
+                        console.error('Error performing transition:', error);
+                        piranha.notifications.push({
+                            body: "Failed to perform workflow transition",
+                            type: "danger",
+                            hide: true
+                        });
+                    });
                 },
                 
                 // Update workflow instance
@@ -149,6 +295,14 @@
                     this.editingInstance = null;
                 },
                 
+                // Cancel transition
+                cancelTransition: function() {
+                    this.transitionModal = false;
+                    this.transitioningInstance = null;
+                    this.selectedTransition = null;
+                    this.transitionComment = '';
+                },
+                
                 // Format date
                 formatDate: function(dateString) {
                     if (!dateString) return 'N/A';
@@ -176,6 +330,20 @@
                 getWorkflowDefinitionName: function(workflowDefinitionId) {
                     var def = this.workflowDefinitions[workflowDefinitionId];
                     return def ? def.name : 'Unknown Workflow';
+                },
+                
+                // Get current state name
+                getCurrentStateName: function(currentStateId) {
+                    var state = this.workflowStates[currentStateId];
+                    return state ? state.name : 'Unknown State';
+                },
+                
+                // Get transition display name
+                getTransitionDisplayName: function(transition) {
+                    if (transition.toState && transition.toState.name) {
+                        return 'Move to: ' + transition.toState.name;
+                    }
+                    return transition.description || 'Transition';
                 }
             },
             mounted: function() {
@@ -245,6 +413,7 @@
                                         <th>Content</th>
                                         <th>Content Type</th>
                                         <th>Workflow</th>
+                                        <th>Current State</th>
                                         <th>Status</th>
                                         <th>Created By</th>
                                         <th>Created</th>
@@ -266,6 +435,11 @@
                                         </td>
                                         <td>{{ getWorkflowDefinitionName(instance.workflowDefinitionId) }}</td>
                                         <td>
+                                            <span class="badge badge-outline-primary">
+                                                {{ getCurrentStateName(instance.currentStateId) }}
+                                            </span>
+                                        </td>
+                                        <td>
                                             <span class="badge" :class="getStatusClass(instance.status)">
                                                 {{ getStatusString(instance.status) }}
                                             </span>
@@ -280,11 +454,18 @@
                                             <small>{{ formatDate(instance.lastModified) }}</small>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-outline-primary" 
-                                                    v-on:click="editInstance(instance)"
-                                                    title="Edit Instance">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-outline-primary" 
+                                                        v-on:click="editInstance(instance)"
+                                                        title="Edit Instance">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-success" 
+                                                        v-on:click="openTransitionModal(instance)"
+                                                        title="Transition to Next State">
+                                                    <i class="fas fa-arrow-right"></i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -369,5 +550,67 @@
             </div>
         </div>
     </div>
-    <div v-if="editModal" class="modal-backdrop fade show"></div>
+
+    <!-- Transition Modal -->
+    <div class="modal fade" :class="{ show: transitionModal }" :style="{ display: transitionModal ? 'block' : 'none' }" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-arrow-right"></i>
+                        Workflow Transition
+                    </h5>
+                    <button type="button" class="close" v-on:click="cancelTransition">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" v-if="transitioningInstance">
+                    <div class="mb-3">
+                        <strong>{{ transitioningInstance.contentTitle || 'Untitled' }}</strong>
+                        <br>
+                        <small class="text-muted">Current Status: {{ getStatusString(transitioningInstance.status) }}</small>
+                    </div>
+                    
+                    <form>
+                        <div class="form-group" v-if="availableTransitions.length > 0">
+                            <label>Select Next State</label>
+                            <select class="form-control" v-model="selectedTransition" required>
+                                <option value="">-- Select a transition --</option>
+                                <option v-for="transition in availableTransitions" :key="transition.id" :value="transition.id">
+                                    {{ getTransitionDisplayName(transition) }}
+                                </option>
+                            </select>
+                        </div>
+                        
+                        <div v-if="availableTransitions.length === 0" class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            No transitions available from the current state.
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Comment</label>
+                            <textarea class="form-control" rows="3" v-model="transitionComment" 
+                                      placeholder="Add a comment about this transition..."></textarea>
+                            <small class="form-text text-muted">
+                                <span v-if="selectedTransition && availableTransitions.find(t => t.id === selectedTransition && t.requiresComment)" class="text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> Comment is required for this transition
+                                </span>
+                            </small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" v-on:click="cancelTransition">Cancel</button>
+                    <button type="button" class="btn btn-success" v-on:click="performTransition" 
+                            :disabled="!selectedTransition || availableTransitions.length === 0">
+                        <i class="fas fa-arrow-right"></i>
+                        Perform Transition
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal backdrops -->
+    <div v-if="editModal || transitionModal" class="modal-backdrop fade show"></div>
 </div>
