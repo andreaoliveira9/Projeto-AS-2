@@ -20,11 +20,12 @@
                 selectedNotification: null,
                 detailModal: false,
                 filterContentId: '',
-                filteredNotifications: []
+                filteredNotifications: [],
+                filterPageName: ''
             },
             computed: {
                 displayNotifications: function() {
-                    if (this.filterContentId) {
+                    if (this.filterPageName) {
                         return this.filteredNotifications;
                     }
                     return this.notifications;
@@ -89,47 +90,29 @@
                     });
                 },
                 
-                // Filter notifications by content ID
-                filterByContent: function(contentId) {
+                // Filter notifications by page name
+                filterByPageName: function(pageName) {
                     var self = this;
                     
-                    if (!contentId) {
-                        self.filterContentId = '';
+                    if (!pageName) {
+                        self.filterPageName = '';
                         self.filteredNotifications = [];
                         return;
                     }
                     
-                    self.filterContentId = contentId;
+                    self.filterPageName = pageName;
                     
-                    fetch('/api/notifications/content/' + contentId, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    })
-                    .then(function(response) {
-                        if (!response.ok) {
-                            if (response.status === 404) {
-                                self.filteredNotifications = [];
-                                return [];
-                            }
-                            throw new Error('Failed to filter notifications');
-                        }
-                        return response.json();
-                    })
-                    .then(function(data) {
-                        self.filteredNotifications = data || [];
-                        console.log('Filtered notifications:', self.filteredNotifications);
-                    })
-                    .catch(function(error) {
-                        console.error('Error filtering notifications:', error);
-                        self.filteredNotifications = [];
+                    // Filter locally by page name
+                    self.filteredNotifications = self.notifications.filter(function(notification) {
+                        return notification.contentName === pageName;
                     });
+                    
+                    console.log('Filtered notifications by page name:', self.filteredNotifications);
                 },
                 
-                // Clear content filter
+                // Clear page name filter
                 clearFilter: function() {
-                    this.filterContentId = '';
+                    this.filterPageName = '';
                     this.filteredNotifications = [];
                 },
                 
@@ -206,10 +189,10 @@
                     }
                 },
                 
-                // Get unique content IDs for filter dropdown
-                getUniqueContentIds: function() {
-                    var contentIds = [...new Set(this.notifications.map(n => n.contentId))];
-                    return contentIds.sort();
+                // Get unique page names for filter dropdown
+                getUniquePageNames: function() {
+                    var pageNames = [...new Set(this.notifications.map(n => n.contentName).filter(name => name && name.trim() !== ''))];
+                    return pageNames.sort();
                 }
             },
             mounted: function() {
@@ -317,17 +300,17 @@
                         <div class="row align-items-center">
                             <div class="col-md-6">
                                 <div class="form-group mb-0">
-                                    <label for="contentFilter" class="form-label">Filter by Content ID:</label>
-                                    <select id="contentFilter" class="form-control" v-model="filterContentId" v-on:change="filterByContent(filterContentId)">
-                                        <option value="">-- All Content --</option>
-                                        <option v-for="contentId in getUniqueContentIds()" :key="contentId" :value="contentId">
-                                            {{ contentId }}
+                                    <label for="pageFilter" class="form-label">Filter by Page Name:</label>
+                                    <select id="pageFilter" class="form-control" v-model="filterPageName" v-on:change="filterByPageName(filterPageName)">
+                                        <option value="">-- All Pages --</option>
+                                        <option v-for="pageName in getUniquePageNames()" :key="pageName" :value="pageName">
+                                            {{ pageName }}
                                         </option>
                                     </select>
                                 </div>
                             </div>
                             <div class="col-md-6 text-right">
-                                <button v-if="filterContentId" class="btn btn-outline-secondary" v-on:click="clearFilter()">
+                                <button v-if="filterPageName" class="btn btn-outline-secondary" v-on:click="clearFilter()">
                                     <i class="fas fa-times"></i> Clear Filter
                                 </button>
                                 <button class="btn btn-outline-primary ml-2" v-on:click="load()">
@@ -347,7 +330,7 @@
                     <div class="card-header">
                         <h5 class="card-title mb-0">
                             <i class="fas fa-bell"></i>
-                            <span v-if="filterContentId">Filtered Notifications</span>
+                            <span v-if="filterPageName">Filtered Notifications</span>
                             <span v-else>All Notifications</span>
                             <span class="badge badge-secondary ml-2">{{ displayNotifications.length }}</span>
                         </h5>
@@ -410,9 +393,9 @@
                     </div>
                     <div v-else class="card-body text-center text-muted">
                         <i class="fas fa-bell-slash fa-3x mb-3"></i>
-                        <p v-if="filterContentId">No notifications found for the selected content</p>
+                        <p v-if="filterPageName">No notifications found for the selected page</p>
                         <p v-else>No notifications found</p>
-                        <small v-if="filterContentId">Try clearing the filter or selecting a different content ID</small>
+                        <small v-if="filterPageName">Try clearing the filter or selecting a different page</small>
                         <small v-else>Notifications will appear here when workflow state changes occur</small>
                     </div>
                 </div>
