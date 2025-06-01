@@ -3,11 +3,10 @@
   "contentName": "Sample Content",
   "fromState": "Draft",
   "toState": "Published",
-  "username": "john.doe",
+  "transitionDescription": "Content need review",
+  "approvedBy": "jane.smith",
   "timestamp": "2024-01-15T10:30:00.000Z",
   "comments": "Content approved after review",
-  "approvedBy": "jane.smith",
   "success": true,
-  "errorMessage": null,
-  "transitionDescription": "Content need review"
+  "errorMessage": null
 }

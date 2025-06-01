@@ -156,17 +156,14 @@ namespace MvcWeb.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    WorkflowInstanceId = table.Column<Guid>(type: "TEXT", nullable: false),
                     ContentId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    ContentType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
-                    FromState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    ContentName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    FromState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     ToState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    UserId = table.Column<string>(type: "TEXT", maxLength: 450, nullable: false),
-                    Username = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    transitionDescription = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
+                    approvedBy = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
                     Timestamp = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Comments = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    TransitionRuleId = table.Column<Guid>(type: "TEXT", nullable: true),
-                    Metadata = table.Column<string>(type: "TEXT", nullable: true),
                     Success = table.Column<bool>(type: "INTEGER", nullable: false, defaultValue: true),
                     ErrorMessage = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true)
                 },
@@ -1259,6 +1256,11 @@ namespace MvcWeb.Migrations
                 column: "LanguageId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_approvedBy",
+                table: "Piranha_StateChangeRecords",
+                column: "approvedBy");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Piranha_StateChangeRecords_ContentId",
                 table: "Piranha_StateChangeRecords",
                 column: "ContentId");
@@ -1282,21 +1284,6 @@ namespace MvcWeb.Migrations
                 name: "IX_Piranha_StateChangeRecords_Timestamp",
                 table: "Piranha_StateChangeRecords",
                 column: "Timestamp");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Piranha_StateChangeRecords_TransitionRuleId",
-                table: "Piranha_StateChangeRecords",
-                column: "TransitionRuleId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Piranha_StateChangeRecords_UserId",
-                table: "Piranha_StateChangeRecords",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Piranha_StateChangeRecords_WorkflowInstanceId",
-                table: "Piranha_StateChangeRecords",
-                column: "WorkflowInstanceId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Piranha_Tags_BlogId_Slug",

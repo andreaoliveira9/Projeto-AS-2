@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 using Microsoft.Extensions.DependencyInjection;
 using Piranha;
 using Piranha.EditorialWorkflow.Repositories;

@@ -196,8 +196,8 @@ public sealed class AuditMessageConsumerService : BackgroundService
             if (stateChangedEvent != null)
             {
                 await auditService.ProcessWorkflowStateChangedEventAsync(stateChangedEvent, cancellationToken);
-                _logger.LogDebug("Successfully processed workflow state changed event {EventId}",
-                    stateChangedEvent.EventId);
+                _logger.LogDebug("Successfully processed workflow state changed event for content {ContentId}",
+                    stateChangedEvent.ContentId);
             }
             else
             {
