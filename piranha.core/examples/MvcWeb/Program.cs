@@ -7,7 +7,7 @@ using Piranha.EditorialWorkflow.Extensions;
 using Piranha.Notifications.Extensions;
 using Piranha.Audit.Extensions;
 using Piranha.Manager.Editor;
-using Piranha.Data.EF.EditorialWorkflowAndAudit;
+using Piranha.Data.EF.EditorialWorkflowAndAuditAndNotifications;
 
 var builder = WebApplication.CreateBuilder(args);
 

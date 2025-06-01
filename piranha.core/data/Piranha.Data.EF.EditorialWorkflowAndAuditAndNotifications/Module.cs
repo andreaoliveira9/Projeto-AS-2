@@ -16,8 +16,10 @@ using Piranha.EditorialWorkflow.Repositories;
 using Piranha.Repositories.EditorialWorkflow;
 using Piranha.Audit.Repositories;
 using Piranha.Repositories.Audit;
+using Piranha.Notifications.Repositories;
+using Piranha.Repositories.Notifications;
 
-namespace Piranha.Data.EF.EditorialWorkflowAndAudit;
+namespace Piranha.Data.EF.EditorialWorkflowAndAuditAndNotifications;
 
 /// <summary>
 /// Extension methods for setting up Editorial Workflow services.
@@ -72,6 +74,45 @@ public static class PiranhaServiceCollectionExtensions
     public static PiranhaServiceBuilder UseAuditEF(this PiranhaServiceBuilder serviceBuilder)
     {
         serviceBuilder.Services.AddAuditRepositories();
+        
+        return serviceBuilder;
+    }
+    
+    /// <summary>
+    /// Adds the Notifications EF repositories to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <returns>The service collection</returns>
+    public static IServiceCollection AddNotificationsRepositories(this IServiceCollection services)
+    {
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IStateChangedNotificationRepository, StateChangedNotificationRepository>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Uses the Notifications EF repositories.
+    /// </summary>
+    /// <param name="serviceBuilder">The service builder</param>
+    /// <returns>The updated builder</returns>
+    public static PiranhaServiceBuilder UseNotificationsEF(this PiranhaServiceBuilder serviceBuilder)
+    {
+        serviceBuilder.Services.AddNotificationsRepositories();
+        
+        return serviceBuilder;
+    }
+
+    /// <summary>
+    /// Uses all EF repositories (Editorial Workflow, Audit and Notifications).
+    /// </summary>
+    /// <param name="serviceBuilder">The service builder</param>
+    /// <returns>The updated builder</returns>
+    public static PiranhaServiceBuilder UseEditorialWorkflowAndAuditAndNotificationsEF(this PiranhaServiceBuilder serviceBuilder)
+    {
+        serviceBuilder.Services.AddEditorialWorkflowRepositories();
+        serviceBuilder.Services.AddAuditRepositories();
+        serviceBuilder.Services.AddNotificationsRepositories();
         
         return serviceBuilder;
     }

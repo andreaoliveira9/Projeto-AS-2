@@ -16,7 +16,7 @@
     <ProjectReference Include="..\..\core\Piranha.Manager.LocalAuth\Piranha.Manager.LocalAuth.csproj" />
     <ProjectReference Include="..\..\core\Piranha.Manager.TinyMCE\Piranha.Manager.TinyMCE.csproj" />
     <ProjectReference Include="..\..\data\Piranha.Data.EF.SQLite\Piranha.Data.EF.SQLite.csproj" />
-    <ProjectReference Include="..\..\data\Piranha.Data.EF.EditorialWorkflowAndAudit\Piranha.Data.EF.EditorialWorkflowAndAudit.csproj" />
+    <ProjectReference Include="..\..\data\Piranha.Data.EF.EditorialWorkflowAndAuditAndNotifications\Piranha.Data.EF.EditorialWorkflowAndAuditAndNotifications.csproj" />
     <ProjectReference Include="..\..\core\Piranha.Audit\Piranha.Audit.csproj" />
     <ProjectReference Include="..\..\core\Piranha.Notifications\Piranha.Notifications.csproj" />
     <ProjectReference Include="..\..\identity\Piranha.AspNetCore.Identity.SQLite\Piranha.AspNetCore.Identity.SQLite.csproj" />
