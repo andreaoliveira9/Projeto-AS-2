@@ -8,16 +8,14 @@
  *
  */
 
-#nullable enable
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Piranha;
-using Piranha.Audit.Configuration;
-using Piranha.Audit.Services;
-using Piranha.Audit.Controllers;
+using Piranha.Notifications.Configuration;
+using Piranha.Notifications.Services;
+using Piranha.Notifications.Controllers;
 
-namespace Piranha.Audit.Extensions;
+namespace Piranha.Notifications.Extensions;
 
 
 /// <summary>
@@ -33,23 +31,23 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection</param>
     /// <param name="configureOptions">Action to configure RabbitMQ options</param>
     /// <returns>The service collection</returns>
-    public static IServiceCollection AddAudit(this IServiceCollection services, Action<RabbitMQOptions> configureOptions)
+    public static IServiceCollection AddNotifications(this IServiceCollection services, Action<RabbitMQOptions> configureOptions)
     {
 
         // Configure RabbitMQ options
         services.Configure(configureOptions);
 
         // Register core audit service - only for consuming messages
-        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<INotificationsService, NotificationsService>();
 
         // Register RabbitMQ connection service
         services.AddSingleton<IRabbitMQConnectionService, RabbitMQConnectionService>();
 
         // Register background service for consuming audit messages from RabbitMQ
-        services.AddHostedService<AuditMessageConsumerService>();
+        services.AddHostedService<NotificationsMessageConsumerService>();
 
         services.AddControllers()
-            .AddApplicationPart(typeof(AuditController).Assembly)
+            .AddApplicationPart(typeof(NotificationsController).Assembly)
             .AddControllersAsServices();
 
         return services;
@@ -67,9 +65,9 @@ public static class PiranhaServiceBuilderExtensions
     /// <param name="serviceBuilder">The service builder</param>
     /// <param name="configureOptions">Action to configure RabbitMQ options</param>
     /// <returns>The updated builder</returns>
-    public static PiranhaServiceBuilder UseAudit(this PiranhaServiceBuilder serviceBuilder, Action<RabbitMQOptions> configureOptions)
+    public static PiranhaServiceBuilder UseNotifications(this PiranhaServiceBuilder serviceBuilder, Action<RabbitMQOptions> configureOptions)
     {
-        serviceBuilder.Services.AddAudit(configureOptions);
+        serviceBuilder.Services.AddNotifications(configureOptions);
 
         return serviceBuilder;
     }

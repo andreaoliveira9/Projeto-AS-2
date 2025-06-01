@@ -499,9 +499,9 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         return instance; 
     }
     
-    public async Task<bool> TransitionWorkflowAsync(Guid instanceId, string targetState) 
+    public Task<bool> TransitionWorkflowAsync(Guid instanceId, string targetState) 
     { 
-        return true; // Simplified for now
+        return Task.FromResult(true); // Simplified for now
     }
     
     public async Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByUserAsync() 
@@ -510,9 +510,9 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         return await _workflowInstanceRepository.GetByUser(user.Id.ToString()); 
     }
     
-    public async Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByStateAsync(string state) 
+    public Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByStateAsync(string state) 
     { 
-        return new List<WorkflowInstance>(); // Simplified for now
+        return Task.FromResult<IEnumerable<WorkflowInstance>>(new List<WorkflowInstance>()); // Simplified for now
     }
     
     public async Task<WorkflowInstance> GetWorkflowInstanceByIdAsync(Guid id) 
@@ -520,9 +520,9 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         return await _workflowInstanceRepository.GetById(id); 
     }
     
-    public async Task<bool> TestDatabaseConnectionAsync() 
+    public Task<bool> TestDatabaseConnectionAsync() 
     { 
-        return true; 
+        return Task.FromResult(true); 
     }
     
     public async Task<IEnumerable<Piranha.AspNetCore.Identity.Data.Role>> GetSystemRolesAsync() 

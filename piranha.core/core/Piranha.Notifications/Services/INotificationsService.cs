@@ -8,18 +8,15 @@
  *
  */
 
-#nullable enable
+using Piranha.Notifications.Events;
 
-using Piranha.Audit.Events;
-using Piranha.Audit.Models;
-
-namespace Piranha.Audit.Services;
+namespace Piranha.Notifications.Services;
 
 /// <summary>
 /// Service for handling audit and history operations.
 /// Focused on consuming messages and storing audit records.
 /// </summary>
-public interface IAuditService
+public interface INotificationsService
 {
     /// <summary>
     /// Processes a workflow state changed event received from message queue.
@@ -27,11 +24,4 @@ public interface IAuditService
     /// <param name="stateChangedEvent">The state changed event to process</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task ProcessWorkflowStateChangedEventAsync(WorkflowStateChangedEvent stateChangedEvent, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Gets state change history for content.
-    /// </summary>
-    /// <param name="contentId">The content id</param>
-    /// <returns>The state change records</returns>
-    Task<IEnumerable<StateChangeRecord>> GetStateChangeHistoryAsync(Guid contentId);
 }

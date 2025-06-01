@@ -10,19 +10,14 @@
 
 #nullable enable
 
-namespace Piranha.Audit.Models;
+namespace Piranha.Notifications.Events;
 
 /// <summary>
-/// Specialized audit record for workflow state transitions.
+/// Event triggered when a workflow state transition occurs.
 /// </summary>
 [Serializable]
-public sealed class StateChangeRecord
+public sealed class WorkflowStateChangedEvent
 {
-    /// <summary>
-    /// Gets/sets the unique id.
-    /// </summary>
-    public Guid Id { get; set; }
-
     /// <summary>
     /// Gets/sets the content id.
     /// </summary>

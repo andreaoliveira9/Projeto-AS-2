@@ -20,23 +20,26 @@ public class EditorialWorkflowController : ControllerBase
     private readonly IApi _api;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly UserManager<User> _userManager;
+    private readonly IWorkflowMessagePublisher _messagePublisher;
 
     public EditorialWorkflowController(
         IEditorialWorkflowService workflowService,
         ILogger<EditorialWorkflowController> logger,
         IApi api,
         IHttpContextAccessor httpContextAccessor,
-        UserManager<User> userManager)
+        UserManager<User> userManager,
+        IWorkflowMessagePublisher messagePublisher)
     {
         _workflowService = workflowService;
         _logger = logger;
         _api = api;
         _httpContextAccessor = httpContextAccessor;
         _userManager = userManager;
+        _messagePublisher = messagePublisher;
     }
 
     #region Request Models
-    
+
     public class CreateWorkflowInstanceWithContentRequest
     {
         public string ContentId { get; set; }
@@ -58,7 +61,7 @@ public class EditorialWorkflowController : ControllerBase
         public WorkflowState CurrentState { get; set; }
         public IList<TransitionRule> AvailableTransitions { get; set; }
     }
-    
+
     #endregion
 
     #region Workflow Definitions
@@ -210,8 +213,8 @@ public class EditorialWorkflowController : ControllerBase
                 contentId = contentId,
                 deletedWorkflowInstanceId = deletedInstanceId,
                 deletedWorkflowContentExtensionId = deletedExtensionId,
-                summary = deletedInstanceId.HasValue 
-                    ? "Deleted both WorkflowInstance and WorkflowContentExtension" 
+                summary = deletedInstanceId.HasValue
+                    ? "Deleted both WorkflowInstance and WorkflowContentExtension"
                     : "Deleted WorkflowContentExtension only (no active instance found)"
             });
         }
@@ -223,13 +226,111 @@ public class EditorialWorkflowController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all workflow instances regardless of user (admin access)
+    /// Gets all workflow instances regardless of user (admin access) with user information
     /// </summary>
     [HttpGet("workflow-instances")]
-    public async Task<ActionResult<IEnumerable<WorkflowInstance>>> GetAllWorkflowInstances()
+    public async Task<ActionResult<IEnumerable<object>>> GetAllWorkflowInstances()
     {
         var instances = await _workflowService.GetAllWorkflowInstancesAsync();
-        return Ok(instances);
+
+        // Get all unique user IDs from the instances
+        var userIds = instances
+            .Where(i => !string.IsNullOrEmpty(i.CreatedBy) && i.CreatedBy.ToLower() != "system")
+            .Select(i => i.CreatedBy)
+            .Distinct()
+            .ToList();
+
+        // Fetch user information for all user IDs
+        var userDict = new Dictionary<string, object>();
+
+        foreach (var userId in userIds)
+        {
+            try
+            {
+                // Try to get user by ID first
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user != null)
+                {
+                    userDict[userId] = new
+                    {
+                        Id = user.Id,
+                        UserName = user.UserName,
+                        Email = user.Email,
+                        DisplayName = !string.IsNullOrEmpty(user.UserName) ? user.UserName : user.Email
+                    };
+                }
+                else
+                {
+                    // Try to get user by username/email if not found by ID
+                    user = await _userManager.FindByNameAsync(userId) ?? await _userManager.FindByEmailAsync(userId);
+                    if (user != null)
+                    {
+                        userDict[userId] = new
+                        {
+                            Id = user.Id,
+                            UserName = user.UserName,
+                            Email = user.Email,
+                            DisplayName = !string.IsNullOrEmpty(user.UserName) ? user.UserName : user.Email
+                        };
+                    }
+                    else
+                    {
+                        // User not found, create a fallback entry
+                        userDict[userId] = new
+                        {
+                            Id = userId,
+                            UserName = userId,
+                            Email = userId,
+                            DisplayName = userId
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load user information for user ID: {UserId}", userId);
+                // Create a fallback entry for failed lookups
+                userDict[userId] = new
+                {
+                    Id = userId,
+                    UserName = userId,
+                    Email = userId,
+                    DisplayName = userId
+                };
+            }
+        }
+
+        // Create the response with enhanced instance data
+        var enhancedInstances = instances.Select(instance => new
+        {
+            // All original instance properties
+            Id = instance.Id,
+            ContentId = instance.ContentId,
+            ContentType = instance.ContentType,
+            ContentTitle = instance.ContentTitle,
+            WorkflowDefinitionId = instance.WorkflowDefinitionId,
+            CurrentStateId = instance.CurrentStateId,
+            Status = instance.Status,
+            Metadata = instance.Metadata,
+            Created = instance.Created,
+            LastModified = instance.LastModified,
+            CreatedBy = instance.CreatedBy,
+
+            // Enhanced user information
+            CreatedByUser = userDict.ContainsKey(instance.CreatedBy ?? "")
+                ? userDict[instance.CreatedBy]
+                : new
+                {
+                    Id = instance.CreatedBy ?? "system",
+                    UserName = instance.CreatedBy ?? "System",
+                    Email = instance.CreatedBy ?? "system",
+                    DisplayName = string.IsNullOrEmpty(instance.CreatedBy) || instance.CreatedBy.ToLower() == "system"
+                        ? "System"
+                        : instance.CreatedBy
+                }
+        });
+
+        return Ok(enhancedInstances);
     }
 
     [HttpGet("instances/{id}")]
@@ -431,7 +532,6 @@ public class EditorialWorkflowController : ControllerBase
             _logger.LogInformation("Transition will be performed by user: {UserName} ({UserId})",
                 user.UserName ?? user.Email, user.Id);
 
-
             // Add transition comment to metadata if provided
             if (!string.IsNullOrWhiteSpace(request.Comment))
             {
@@ -470,27 +570,17 @@ public class EditorialWorkflowController : ControllerBase
                 // Parse contentId to Guid for the message
                 if (Guid.TryParse(workflowInstance.ContentId, out var contentGuid))
                 {
-                    // Create the audit event message
+                    // Create the audit event message using the new simplified structure
                     var stateChangedEvent = new WorkflowStateChangedEvent
                     {
-                        EventId = Guid.NewGuid(),
-                        WorkflowInstanceId = workflowInstance.Id,
                         ContentId = contentGuid,
-                        ContentType = workflowInstance.ContentType ?? "Unknown",
+                        ContentName = workflowInstance.ContentTitle ?? "Unknown Content",
                         FromState = fromState.Name,
                         ToState = targetState.Name,
-                        UserId = user.Id,
-                        Username = user.UserName ?? user.Email ?? "Unknown",
+                        transitionDescription = transitionRule.Description ?? "Content need review",
+                        approvedBy = user.UserName ?? user.Email ?? "Unknown",
                         Timestamp = DateTime.UtcNow,
                         Comments = request.Comment,
-                        TransitionRuleId = transitionRule.Id,
-                        IsAutomaticTransition = false,
-                        Metadata = new Dictionary<string, object>
-                        {
-                            { "transitionDescription", transitionRule.Description ?? "State transition" },
-                            { "approvedBy", user.UserName ?? user.Email ?? "Unknown" },
-                            { "contentName", workflowInstance.ContentTitle ?? "Unknown Content" }
-                        },
                         Success = true,
                         ErrorMessage = null
                     };
@@ -565,10 +655,10 @@ public class EditorialWorkflowController : ControllerBase
             {
                 case "page":
                     return await PublishPageAsync(contentGuid);
-                
+
                 case "post":
                     return await PublishPostAsync(contentGuid);
-                
+
                 default:
                     _logger.LogWarning("Content publishing not supported for content type: {ContentType}", contentType);
                     return false;
@@ -605,9 +695,9 @@ public class EditorialWorkflowController : ControllerBase
 
             // Set published date and save
             page.Published = DateTime.UtcNow;
-            
+
             await _api.Pages.SaveAsync(page);
-            
+
             _logger.LogInformation("Successfully published page {PageId}", pageId);
             return true;
         }
@@ -642,9 +732,9 @@ public class EditorialWorkflowController : ControllerBase
 
             // Set published date and save
             post.Published = DateTime.UtcNow;
-            
+
             await _api.Posts.SaveAsync(post);
-            
+
             _logger.LogInformation("Successfully published post {PostId}", postId);
             return true;
         }
@@ -686,14 +776,14 @@ public class EditorialWorkflowController : ControllerBase
             // Get all states for this workflow definition
             var workflowStates = await _workflowService.GetWorkflowStatesByDefinitionAsync(workflowInstance.WorkflowDefinitionId);
             var initialState = workflowStates.FirstOrDefault(s => s.IsInitial);
-            
+
             if (initialState == null)
                 return BadRequest("No initial state found for this workflow");
 
             // Reset the workflow instance to the initial state
             workflowInstance.CurrentStateId = initialState.Id;
             workflowInstance.LastModified = DateTime.UtcNow;
-            
+
             // Add rejection metadata
             var rejectionLog = new
             {
@@ -706,14 +796,14 @@ public class EditorialWorkflowController : ControllerBase
 
             // Update metadata with rejection log
             var metadata = string.IsNullOrWhiteSpace(workflowInstance.Metadata) ? "{}" : workflowInstance.Metadata;
-            workflowInstance.Metadata = metadata.TrimEnd('}') + 
-                (metadata == "{}" ? "" : ",") + 
+            workflowInstance.Metadata = metadata.TrimEnd('}') +
+                (metadata == "{}" ? "" : ",") +
                 $"\"lastRejection\":{System.Text.Json.JsonSerializer.Serialize(rejectionLog)}}}";
 
             // Update the workflow instance
             var updatedInstance = await _workflowService.UpdateWorkflowInstanceAsync(workflowInstance);
 
-            _logger.LogInformation("Workflow instance {InstanceId} rejected and reset to initial state {StateId}", 
+            _logger.LogInformation("Workflow instance {InstanceId} rejected and reset to initial state {StateId}",
                 instanceId, initialState.Id);
 
             return Ok(new
@@ -804,12 +894,12 @@ public class EditorialWorkflowController : ControllerBase
             }
 
             var workflowInstance = await _workflowService.CreateWorkflowInstanceWithContentAsync(
-                request.ContentId, 
+                request.ContentId,
                 request.WorkflowDefinitionId,
-                request.ContentType, 
+                request.ContentType,
                 request.ContentTitle);
 
-            return Ok(new { 
+            return Ok(new {
                 workflowInstanceId = workflowInstance.Id,
                 contentId = workflowInstance.ContentId,
                 workflowDefinitionId = workflowInstance.WorkflowDefinitionId,
@@ -850,7 +940,7 @@ public class EditorialWorkflowController : ControllerBase
             if (existingContentExtension != null)
             {
                 _logger.LogInformation("Found existing WorkflowContentExtension for page {PageId}, deleting it", pageId);
-                
+
                 // If there's an active workflow instance, delete it first
                 if (existingContentExtension.CurrentWorkflowInstanceId.HasValue)
                 {
@@ -861,7 +951,7 @@ public class EditorialWorkflowController : ControllerBase
                         await _workflowService.DeleteWorkflowInstanceAsync(existingInstance.Id);
                     }
                 }
-                
+
                 // Delete the WorkflowContentExtension
                 await _workflowService.DeleteWorkflowContentExtensionAsync(contentId);
             }
@@ -918,7 +1008,7 @@ public class EditorialWorkflowController : ControllerBase
         var extension = await _workflowService.GetWorkflowContentExtensionAsync(contentId);
         if (extension == null)
             return NotFound();
-        
+
         return Ok(extension);
     }
 
@@ -1079,7 +1169,7 @@ public class EditorialWorkflowController : ControllerBase
     public async Task<ActionResult> DebugDatabase()
     {
         var canConnect = await _workflowService.TestDatabaseConnectionAsync();
-        return Ok(new { 
+        return Ok(new {
             DatabaseConnected = canConnect,
             Message = canConnect ? "Database connection successful" : "Database connection failed"
         });
@@ -1090,7 +1180,7 @@ public class EditorialWorkflowController : ControllerBase
     public async Task<ActionResult> GetSystemRoles()
     {
         var roles = await _workflowService.GetSystemRolesAsync();
-        return Ok(roles.Select(r => new { 
+        return Ok(roles.Select(r => new {
             Id = r.Id,
             Name = r.Name,
             NormalizedName = r.NormalizedName

@@ -65,34 +65,12 @@
                     });
                 },
                 
-                // Load user information for display names
+                // Load user information for display names (now handled by the API)
                 loadUsers: function() {
                     var self = this;
-                    
-                    // Get unique user IDs from instances
-                    var userIds = [...new Set(self.instances.map(i => i.createdBy).filter(id => id && id !== 'system'))];
-                    
-                    if (userIds.length === 0) {
-                        self.loading = false;
-                        return;
-                    }
-                    
-                    // For now, we'll create a simple mapping since we don't have a user API endpoint
-                    // In a real implementation, you would call a user API here
-                    userIds.forEach(function(userId) {
-                        // Check if it's a GUID (user ID) or already a display name
-                        var isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
-                        
-                        if (isGuid) {
-                            // For GUIDs, we'll show a friendly format until we have a real user API
-                            self.$set(self.users, userId, 'User ' + userId.substring(0, 8));
-                        } else {
-                            // If it's already a name or email, use it directly
-                            self.$set(self.users, userId, userId);
-                        }
-                    });
-                    
-                    console.log('Loaded users:', self.users);
+                    // User information is now included in the API response as CreatedByUser
+                    // No need to make additional calls
+                    console.log('User information included in API response');
                     self.loading = false;
                 },
                 
@@ -500,8 +478,15 @@
                     };
                 },
                 
-                // Get user display name
-                getUserDisplayName: function(userId) {
+                // Get user display name from enhanced user object
+                getUserDisplayName: function(instance) {
+                    // Use the new CreatedByUser object if available
+                    if (instance.createdByUser && instance.createdByUser.displayName) {
+                        return instance.createdByUser.displayName;
+                    }
+                    
+                    // Fallback to the old logic for backward compatibility
+                    var userId = instance.createdBy;
                     if (!userId) return 'System';
                     if (userId.toLowerCase() === 'system') return 'System';
                     return this.users[userId] || userId;
@@ -509,10 +494,29 @@
                 
                 // Get transition display name
                 getTransitionDisplayName: function(transition) {
+                    // First check if toState is populated with the state information
                     if (transition.toState && transition.toState.name) {
-                        return 'Move to: ' + transition.toState.name;
+                        return transition.toState.name;
                     }
-                    return transition.description || 'Transition';
+                    
+                    // If toState has an ID but no name, look it up in our workflowStates
+                    if (transition.toState && transition.toState.id) {
+                        var state = this.workflowStates[transition.toState.id];
+                        if (state) {
+                            return state.name;
+                        }
+                    }
+                    
+                    // If we have a toStateId directly on the transition, look that up
+                    if (transition.toStateId) {
+                        var state = this.workflowStates[transition.toStateId];
+                        if (state) {
+                            return state.name;
+                        }
+                    }
+                    
+                    // Fallback to the transition name/description
+                    return transition.name || transition.description || 'Transition';
                 }
             },
             mounted: function() {
@@ -617,7 +621,7 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="font-weight-medium">{{ getUserDisplayName(instance.createdBy) }}</span>
+                                            <span class="font-weight-medium">{{ getUserDisplayName(instance) }}</span>
                                         </td>
                                         <td>
                                             <small>{{ formatDate(instance.created) }}</small>

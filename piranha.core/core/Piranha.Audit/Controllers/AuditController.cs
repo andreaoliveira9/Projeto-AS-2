@@ -117,8 +117,8 @@ public class AuditController : ControllerBase
                 ContentId = contentId,
                 TotalChanges = recordsList.Count,
                 LastChange = recordsList.FirstOrDefault()?.Timestamp,
-                LastChangedBy = recordsList.FirstOrDefault()?.Username,
-                CurrentState = recordsList.LastOrDefault()?.ToState,
+                LastChangedBy = recordsList.FirstOrDefault()?.approvedBy,
+                CurrentState = recordsList.FirstOrDefault()?.ToState,
                 SuccessfulChanges = recordsList.Count(r => r.Success),
                 FailedChanges = recordsList.Count(r => !r.Success)
             };
@@ -145,19 +145,16 @@ public class AuditController : ControllerBase
         return new StateChangeRecordDto
         {
             Id = record.Id,
-            WorkflowInstanceId = record.WorkflowInstanceId,
             ContentId = record.ContentId,
-            ContentType = record.ContentType,
+            ContentName = record.ContentName,
             FromState = record.FromState,
             ToState = record.ToState,
-            UserId = record.UserId,
-            Username = record.Username,
+            transitionDescription = record.transitionDescription,
+            Username = record.approvedBy,
             Timestamp = record.Timestamp,
             Comments = record.Comments,
-            TransitionRuleId = record.TransitionRuleId,
             Success = record.Success,
-            ErrorMessage = record.ErrorMessage,
-            Metadata = record.Metadata
+            ErrorMessage = record.ErrorMessage
         };
     }
 }
@@ -173,19 +170,14 @@ public class StateChangeRecordDto
     public Guid Id { get; set; }
 
     /// <summary>
-    /// Gets/sets the workflow instance ID.
-    /// </summary>
-    public Guid WorkflowInstanceId { get; set; }
-
-    /// <summary>
     /// Gets/sets the content ID.
     /// </summary>
     public Guid ContentId { get; set; }
 
     /// <summary>
-    /// Gets/sets the content type.
+    /// Gets/sets the content type (e.g., "Page", "Post").
     /// </summary>
-    public string ContentType { get; set; } = string.Empty;
+    public string ContentName { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the previous state.
@@ -198,17 +190,17 @@ public class StateChangeRecordDto
     public string ToState { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the user ID.
+    /// Gets/sets the transition rule id that triggered this change.
     /// </summary>
-    public string UserId { get; set; } = string.Empty;
+    public string transitionDescription { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the username.
+    /// Gets/sets the username for quick reference.
     /// </summary>
     public string Username { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the timestamp.
+    /// Gets/sets when the state change occurred.
     /// </summary>
     public DateTime Timestamp { get; set; }
 
@@ -218,24 +210,14 @@ public class StateChangeRecordDto
     public string? Comments { get; set; }
 
     /// <summary>
-    /// Gets/sets the transition rule ID.
-    /// </summary>
-    public Guid? TransitionRuleId { get; set; }
-
-    /// <summary>
     /// Gets/sets whether the action was successful.
     /// </summary>
     public bool Success { get; set; }
 
     /// <summary>
-    /// Gets/sets the error message if failed.
+    /// Gets/sets the error message if the action failed.
     /// </summary>
     public string? ErrorMessage { get; set; }
-
-    /// <summary>
-    /// Gets/sets additional metadata as JSON.
-    /// </summary>
-    public string? Metadata { get; set; }
 }
 
 /// <summary>

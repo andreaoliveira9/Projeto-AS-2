@@ -371,28 +371,7 @@
                         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
                     }
 
-                    .details-toggle {
-                        cursor: pointer;
-                        border: none;
-                        background: none;
-                        color: #007bff;
-                        padding: 0.25rem 0.5rem;
-                        font-size: 0.875rem;
-                        border-radius: 0.2rem;
-                        transition: all 0.2s ease;
-                    }
-
-                    .details-toggle:hover {
-                        background-color: rgba(0, 123, 255, 0.1);
-                    }
-
-                    .details-content {
-                        display: none;
-                        margin-top: 1rem;
-                        padding-top: 1rem;
-                        border-top: 1px solid #dee2e6;
-                        animation: fadeIn 0.3s ease;
-                    }
+                    /* Estilos relacionados aos detalhes removidos conforme solicitado */
 
                     @* Escape the @ symbol in keyframes with @@ *@
                     @@keyframes fadeIn {
@@ -496,20 +475,7 @@
                         if (summaryEl) summaryEl.style.display = 'block';
                     }
 
-                    function toggleAuditDetails(recordId) {
-                        var detailsElement = document.getElementById('audit-details-' + recordId);
-                        var toggleButton = document.getElementById('audit-toggle-' + recordId);
-                        
-                        if (detailsElement && toggleButton) {
-                            if (detailsElement.style.display === 'none' || detailsElement.style.display === '') {
-                                detailsElement.style.display = 'block';
-                                toggleButton.innerHTML = '<i class="fas fa-chevron-up"></i> Hide Details';
-                            } else {
-                                detailsElement.style.display = 'none';
-                                toggleButton.innerHTML = '<i class="fas fa-chevron-down"></i> Show Details';
-                            }
-                        }
-                    }
+                    // Função toggleAuditDetails removida conforme solicitado
 
                     function renderAuditTimeline(history) {
                         var timeline = document.getElementById('audit-timeline');
@@ -521,9 +487,6 @@
                             var record = history[i];
                             var timelineItem = document.createElement('div');
                             timelineItem.className = 'timeline-item' + (record.success ? '' : ' timeline-item-error');
-                            
-                            var detailsId = 'audit-details-' + record.id;
-                            var toggleId = 'audit-toggle-' + record.id;
                             
                             var html = '';
                             html += '<div class="timeline-marker">';
@@ -540,10 +503,15 @@
                             html += '<span class="badge badge-primary px-2 py-1">' + (record.toState || 'N/A') + '</span>';
                             html += '</h5>';
                             html += '<div class="text-muted small">';
-                            html += '<i class="fas fa-user mr-1"></i> ' + (record.username || record.userId);
+                            html += '<i class="fas fa-user mr-1"></i> ' + (record.username || 'N/A');
                             html += '<span class="mx-2">•</span>';
                             html += '<i class="fas fa-clock mr-1"></i> ' + formatAuditDate(record.timestamp);
                             html += '</div>';
+                            if (record.transitionDescription) {
+                                html += '<div class="text-info small mt-1">';
+                                html += '<i class="fas fa-exchange-alt mr-1"></i> ' + record.transitionDescription;
+                                html += '</div>';
+                            }
                             html += '</div>';
                             html += '<span class="badge ' + (record.success ? 'badge-success' : 'badge-danger') + ' px-3 py-2">';
                             html += record.success ? '<i class="fas fa-check-circle mr-1"></i> Success' : '<i class="fas fa-times-circle mr-1"></i> Failed';
@@ -574,44 +542,7 @@
                                 html += '</div>';
                             }
                             
-                            html += '<button id="' + toggleId + '" class="details-toggle" onclick="toggleAuditDetails(\'' + record.id + '\')">';
-                            html += '<i class="fas fa-chevron-down mr-1"></i> Show Details';
-                            html += '</button>';
-                            html += '<div id="' + detailsId + '" class="details-content" style="display: none;">';
-                            html += '<div class="row">';
-                            html += '<div class="col-sm-6 mb-3">';
-                            html += '<div class="text-muted small mb-1">Content ID:</div>';
-                            html += '<code class="bg-light p-2 d-inline-block rounded">' + record.contentId + '</code>';
-                            html += '</div>';
-                            html += '<div class="col-sm-6 mb-3">';
-                            html += '<div class="text-muted small mb-1">Content Type:</div>';
-                            html += '<div class="bg-light p-2 rounded">' + record.contentType + '</div>';
-                            html += '</div>';
-                            
-                            if (record.workflowInstanceId) {
-                                html += '<div class="col-sm-6 mb-3">';
-                                html += '<div class="text-muted small mb-1">Workflow Instance:</div>';
-                                html += '<code class="bg-light p-2 d-inline-block rounded">' + record.workflowInstanceId + '</code>';
-                                html += '</div>';
-                            }
-                            
-                            if (record.transitionRuleId) {
-                                html += '<div class="col-sm-6 mb-3">';
-                                html += '<div class="text-muted small mb-1">Transition Rule:</div>';
-                                html += '<code class="bg-light p-2 d-inline-block rounded">' + record.transitionRuleId + '</code>';
-                                html += '</div>';
-                            }
-                            
-                            if (record.metadata) {
-                                html += '<div class="col-12">';
-                                html += '<div class="text-muted small mb-1">Metadata:</div>';
-                                var metadataStr = typeof record.metadata === 'object' ? JSON.stringify(record.metadata, null, 2) : record.metadata;
-                                html += '<pre class="bg-light p-3 rounded" style="max-height: 200px; overflow-y: auto;">' + metadataStr + '</pre>';
-                                html += '</div>';
-                            }
-                            
-                            html += '</div>';
-                            html += '</div>';
+                            // Removido o botão "Show Details" conforme solicitado
                             html += '</div>';
                             html += '</div>';
                             html += '</div>';

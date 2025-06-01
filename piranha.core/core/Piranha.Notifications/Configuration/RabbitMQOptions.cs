@@ -8,9 +8,7 @@
  *
  */
 
-#nullable enable
-
-namespace Piranha.Audit.Configuration;
+namespace Piranha.Notifications.Configuration;
 
 /// <summary>
 /// RabbitMQ configuration options for the audit module.
@@ -20,7 +18,7 @@ public sealed class RabbitMQOptions
     /// <summary>
     /// Configuration section name.
     /// </summary>
-    public const string SectionName = "Piranha:Audit:RabbitMQ";
+    public const string SectionName = "Piranha:Notifications:RabbitMQ";
 
     /// <summary>
     /// RabbitMQ connection hostname.
@@ -56,7 +54,7 @@ public sealed class RabbitMQOptions
     /// The queue name to consume audit events from.
     /// Default is "piranha.audit.events".
     /// </summary>
-    public string QueueName { get; set; } = "piranha.audit.events";
+    public string QueueName { get; set; } = "piranha.notifications.events";
 
     /// <summary>
     /// The exchange name for audit events.

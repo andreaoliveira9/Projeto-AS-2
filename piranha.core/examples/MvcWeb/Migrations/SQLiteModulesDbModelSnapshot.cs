@@ -66,9 +66,9 @@ namespace MvcWeb.Migrations
                     b.Property<Guid>("ContentId")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ContentType")
+                    b.Property<string>("ContentName")
                         .IsRequired()
-                        .HasMaxLength(50)
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ErrorMessage")
@@ -76,10 +76,8 @@ namespace MvcWeb.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FromState")
+                        .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Metadata")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("Success")
@@ -95,19 +93,14 @@ namespace MvcWeb.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("TransitionRuleId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("UserId")
+                    b.Property<string>("approvedBy")
                         .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Username")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("WorkflowInstanceId")
+                    b.Property<string>("transitionDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -118,11 +111,7 @@ namespace MvcWeb.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.HasIndex("TransitionRuleId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("WorkflowInstanceId");
+                    b.HasIndex("approvedBy");
 
                     b.HasIndex("ContentId", "Timestamp");
 
@@ -889,6 +878,31 @@ namespace MvcWeb.Migrations
                         .IsUnique();
 
                     b.ToTable("Piranha_MediaVersions", (string)null);
+                });
+
+            modelBuilder.Entity("Piranha.Data.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(13)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
+
+                    b.ToTable("Piranha_Notifications", (string)null);
+
+                    b.HasDiscriminator<string>("NotificationType").HasValue("Base");
+
+                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("Piranha.Data.Page", b =>
@@ -1702,6 +1716,49 @@ namespace MvcWeb.Migrations
                         .IsUnique();
 
                     b.ToTable("Piranha_Taxonomies", (string)null);
+                });
+
+            modelBuilder.Entity("Piranha.Data.Notifications.StateChangedNotification", b =>
+                {
+                    b.HasBaseType("Piranha.Data.Notifications.Notification");
+
+                    b.Property<string>("ApprovedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FromState")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ToState")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TransitionDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasIndex("ApprovedBy");
+
+                    b.HasIndex("ContentId");
+
+                    b.HasIndex("ContentId", "Timestamp");
+
+                    b.HasIndex("FromState", "ToState");
+
+                    b.HasDiscriminator().HasValue("StateChanged");
                 });
 
             modelBuilder.Entity("Piranha.Data.Alias", b =>

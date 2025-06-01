@@ -14,24 +14,23 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Piranha.Audit.Configuration;
-using Piranha.Audit.Events;
-using Piranha.Audit.Services;
+using Piranha.Notifications.Configuration;
+using Piranha.Notifications.Events;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
-namespace Piranha.Audit.Services;
+namespace Piranha.Notifications.Services;
 
 /// <summary>
 /// Background service that consumes audit events from RabbitMQ.
 /// Focused solely on consuming messages and storing audit records.
 /// </summary>
-public sealed class AuditMessageConsumerService : BackgroundService
+public sealed class NotificationsMessageConsumerService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<AuditMessageConsumerService> _logger;
+    private readonly ILogger<NotificationsMessageConsumerService> _logger;
     private readonly IRabbitMQConnectionService _rabbitMQConnectionService;
     private readonly RabbitMQOptions _options;
     private IChannel? _channel;
@@ -44,9 +43,9 @@ public sealed class AuditMessageConsumerService : BackgroundService
     /// <param name="logger">The logger</param>
     /// <param name="rabbitMQConnectionService">The RabbitMQ connection service</param>
     /// <param name="options">RabbitMQ options</param>
-    public AuditMessageConsumerService(
+    public NotificationsMessageConsumerService(
         IServiceProvider serviceProvider,
-        ILogger<AuditMessageConsumerService> logger,
+        ILogger<NotificationsMessageConsumerService> logger,
         IRabbitMQConnectionService rabbitMQConnectionService,
         IOptions<RabbitMQOptions> options)
     {
@@ -190,13 +189,13 @@ public sealed class AuditMessageConsumerService : BackgroundService
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var auditService = scope.ServiceProvider.GetRequiredService<IAuditService>();
+            var notificationsService = scope.ServiceProvider.GetRequiredService<INotificationsService>();
 
             var stateChangedEvent = DeserializeStateChangedEvent(message);
             if (stateChangedEvent != null)
             {
-                await auditService.ProcessWorkflowStateChangedEventAsync(stateChangedEvent, cancellationToken);
-                _logger.LogDebug("Successfully processed workflow state changed event for content {ContentId}",
+                await notificationsService.ProcessWorkflowStateChangedEventAsync(stateChangedEvent, cancellationToken);
+                _logger.LogDebug("Successfully processed workflow state changed event {ContentId}",
                     stateChangedEvent.ContentId);
             }
             else
@@ -206,7 +205,7 @@ public sealed class AuditMessageConsumerService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing audit message: {Message}", 
+            _logger.LogError(ex, "Error processing notification message: {Message}", 
                 message?.Length > 200 ? message[..200] + "..." : message);
             throw;
         }

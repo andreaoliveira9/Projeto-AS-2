@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Piranha.Audit.Configuration;
 using Piranha.Audit.Events;
 using Piranha.Audit.Services;
+using RabbitMQ.Client;
 using System.Text;
 using System.Text.Json;
 
@@ -67,21 +68,30 @@ public sealed class WorkflowMessagePublisher : IWorkflowMessagePublisher
             // Get channel and publish message
             var channel = _rabbitMQConnectionService.GetChannel();
             
+            // Create basic properties for the message
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json"
+            };
+            
             await channel.BasicPublishAsync(
                 exchange: _options.ExchangeName,
                 routingKey: _options.RoutingKey,
+                mandatory: false,
+                basicProperties: properties,
                 body: messageBytes,
                 cancellationToken: cancellationToken);
 
-            _logger.LogInformation("Successfully published workflow state changed event {EventId} for content {ContentId}",
-                stateChangedEvent.EventId, stateChangedEvent.ContentId);
+            _logger.LogInformation("Successfully published workflow state change event for content {ContentId}",
+                stateChangedEvent.ContentId);
 
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish workflow state changed event {EventId}",
-                stateChangedEvent?.EventId);
+            _logger.LogError(ex, "Failed to publish workflow state changed event for content {ContentId}",
+                stateChangedEvent?.ContentId);
             return false;
         }
     }
