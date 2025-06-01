@@ -580,7 +580,7 @@ public class EditorialWorkflowController : ControllerBase
                         ToState = targetState.Name,
                         transitionDescription = transitionRule.Description ?? "Content need review",
                         approvedBy = user.UserName ?? user.Email ?? "Unknown",
-                        Timestamp = DateTime.UtcNow,
+                        Timestamp = DateTime.UtcNow.AddHours(1),
                         Comments = request.Comment,
                         Success = true,
                         ErrorMessage = null
