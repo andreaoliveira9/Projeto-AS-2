@@ -38,7 +38,7 @@ builder.AddPiranha(options =>
     });
     options.UseAuditEF();
 
-    // Audit 
+    // Notifications 
     options.UseNotifications(rabbitMQOptions => {
         rabbitMQOptions.HostName = "localhost";
         rabbitMQOptions.UserName = "user";
@@ -46,6 +46,7 @@ builder.AddPiranha(options =>
         rabbitMQOptions.QueueName = "notifications.WorkflowStateChanged";
         rabbitMQOptions.MaxRetryAttempts = 5;
     });
+    options.UseNotificationsEF();
 
     options.UseFileStorage(naming: Piranha.Local.FileStorageNaming.UniqueFolderNames);
     options.UseImageSharp();
