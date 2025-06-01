@@ -337,11 +337,16 @@
                         return;
                     }
                     
+                    var requestBody = {
+                        comment: self.transitionComment || null
+                    };
+
                     fetch('/api/workflow/instances/' + self.transitioningInstance.id + '/reject', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
-                        }
+                        },
+                        body: JSON.stringify(requestBody)
                     })
                     .then(function(response) {
                         if (!response.ok) {
