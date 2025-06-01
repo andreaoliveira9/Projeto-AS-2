@@ -22,13 +22,13 @@ namespace Piranha.Repositories.Notifications;
 /// </summary>
 public class NotificationRepository : INotificationRepository
 {
-    private readonly INotificationsDb _db;
+    private readonly IDb _db;
 
     /// <summary>
     /// Default constructor.
     /// </summary>
     /// <param name="db">The current db context</param>
-    public NotificationRepository(INotificationsDb db)
+    public NotificationRepository(IDb db)
     {
         _db = db;
     }
@@ -39,7 +39,7 @@ public class NotificationRepository : INotificationRepository
     /// <returns>The available notifications</returns>
     public async Task<IEnumerable<Piranha.Notifications.Models.Notification>> GetAllAsync()
     {
-        var notifications = await _db.Notifications
+        var notifications = await _db.Set<Data.Notifications.Notification>()
             .AsNoTracking()
             .OrderByDescending(n => n.Timestamp)
             .ToListAsync();
@@ -58,7 +58,7 @@ public class NotificationRepository : INotificationRepository
     /// <returns>The notification if found</returns>
     public async Task<Piranha.Notifications.Models.Notification?> GetByIdAsync(Guid id)
     {
-        var notification = await _db.Notifications
+        var notification = await _db.Set<Data.Notifications.Notification>()
             .AsNoTracking()
             .FirstOrDefaultAsync(n => n.Id == id);
 
@@ -78,7 +78,7 @@ public class NotificationRepository : INotificationRepository
     /// <param name="model">The notification model</param>
     public async Task SaveAsync(Piranha.Notifications.Models.Notification model)
     {
-        var notification = await _db.Notifications
+        var notification = await _db.Set<Data.Notifications.Notification>()
             .FirstOrDefaultAsync(n => n.Id == model.Id);
 
         if (notification == null)
@@ -88,12 +88,12 @@ public class NotificationRepository : INotificationRepository
                 Id = model.Id != Guid.Empty ? model.Id : Guid.NewGuid(),
                 Timestamp = model.Timestamp
             };
-            await _db.Notifications.AddAsync(notification);
+            await _db.Set<Data.Notifications.Notification>().AddAsync(notification);
         }
         else
         {
             notification.Timestamp = model.Timestamp;
-            _db.Notifications.Update(notification);
+            _db.Set<Data.Notifications.Notification>().Update(notification);
         }
 
         await ((DbContext)_db).SaveChangesAsync();
@@ -106,12 +106,12 @@ public class NotificationRepository : INotificationRepository
     /// <param name="id">The notification id</param>
     public async Task DeleteAsync(Guid id)
     {
-        var notification = await _db.Notifications
+        var notification = await _db.Set<Data.Notifications.Notification>()
             .FirstOrDefaultAsync(n => n.Id == id);
 
         if (notification != null)
         {
-            _db.Notifications.Remove(notification);
+            _db.Set<Data.Notifications.Notification>().Remove(notification);
             await ((DbContext)_db).SaveChangesAsync();
         }
     }

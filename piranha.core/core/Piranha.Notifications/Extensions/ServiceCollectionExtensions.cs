@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Piranha;
 using Piranha.Notifications.Configuration;
 using Piranha.Notifications.Services;
+using Piranha.Notifications.Repositories;
 
 namespace Piranha.Notifications.Extensions;
 

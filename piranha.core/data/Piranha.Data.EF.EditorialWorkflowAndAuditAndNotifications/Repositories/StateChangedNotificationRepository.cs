@@ -22,13 +22,13 @@ namespace Piranha.Repositories.Notifications;
 /// </summary>
 public class StateChangedNotificationRepository : IStateChangedNotificationRepository
 {
-    private readonly INotificationsDb _db;
+    private readonly IDb _db;
 
     /// <summary>
     /// Default constructor.
     /// </summary>
     /// <param name="db">The current db context</param>
-    public StateChangedNotificationRepository(INotificationsDb db)
+    public StateChangedNotificationRepository(IDb db)
     {
         _db = db;
     }
@@ -39,7 +39,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
     /// <returns>The available state changed notifications</returns>
     public async Task<IEnumerable<Piranha.Notifications.Models.StateChangedNotification>> GetAllAsync()
     {
-        var notifications = await _db.Notifications
+        var notifications = await _db.Set<Data.Notifications.StateChangedNotification>()
             .OfType<StateChangedNotification>()
             .AsNoTracking()
             .OrderByDescending(n => n.Timestamp)
@@ -65,7 +65,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
     /// <returns>The notification if found</returns>
     public async Task<Piranha.Notifications.Models.StateChangedNotification?> GetByIdAsync(Guid id)
     {
-        var notification = await _db.Notifications
+        var notification = await _db.Set<Data.Notifications.StateChangedNotification>()
             .OfType<StateChangedNotification>()
             .AsNoTracking()
             .FirstOrDefaultAsync(n => n.Id == id);
@@ -92,7 +92,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
     /// <param name="model">The notification model</param>
     public async Task SaveAsync(Piranha.Notifications.Models.StateChangedNotification model)
     {
-        var notification = await _db.Notifications
+        var notification = await _db.Set<Data.Notifications.StateChangedNotification>()
             .OfType<StateChangedNotification>()
             .FirstOrDefaultAsync(n => n.Id == model.Id);
 
@@ -109,7 +109,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
                 TransitionDescription = model.TransitionDescription,
                 ApprovedBy = model.ApprovedBy
             };
-            await _db.Notifications.AddAsync(notification);
+            await _db.Set<Data.Notifications.StateChangedNotification>().AddAsync(notification);
         }
         else
         {
@@ -120,7 +120,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
             notification.ToState = model.ToState;
             notification.TransitionDescription = model.TransitionDescription;
             notification.ApprovedBy = model.ApprovedBy;
-            _db.Notifications.Update(notification);
+            _db.Set<Data.Notifications.StateChangedNotification>().Update(notification);
         }
 
         await ((DbContext)_db).SaveChangesAsync();
@@ -133,13 +133,13 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
     /// <param name="id">The notification id</param>
     public async Task DeleteAsync(Guid id)
     {
-        var notification = await _db.Notifications
+        var notification = await _db.Set<Data.Notifications.StateChangedNotification>()
             .OfType<StateChangedNotification>()
             .FirstOrDefaultAsync(n => n.Id == id);
 
         if (notification != null)
         {
-            _db.Notifications.Remove(notification);
+            _db.Set<Data.Notifications.StateChangedNotification>().Remove(notification);
             await ((DbContext)_db).SaveChangesAsync();
         }
     }
