@@ -117,8 +117,8 @@ public static class Menu
                 },
                 new MenuItem
                 {
-                    InternalId = "UserList",
-                    Name = "Users",
+                    InternalId = "Notifications",
+                    Name = "Notifications",
                     Route = "~/manager/notifications",
                     Policy = Permission.Workflows,
                     Css = "fas fa-bell"
