@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Piranha/Piranha.csproj" />
+    <ProjectReference Include="../Piranha.Audit/Piranha.Audit.csproj" />
     <ProjectReference Include="../../identity/Piranha.AspNetCore.Identity/Piranha.AspNetCore.Identity.csproj" />
   </ItemGroup>
 

@@ -10,6 +10,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Piranha;
+using Piranha.Audit.Services;
 using Piranha.EditorialWorkflow.Services;
 
 namespace Piranha.EditorialWorkflow.Extensions;
@@ -27,6 +28,12 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddEditorialWorkflow(this IServiceCollection services)
     {
         services.AddScoped<IEditorialWorkflowService, EditorialWorkflowService>();
+
+        // Add RabbitMQ connection service (shared with Audit module)
+        services.AddSingleton<IRabbitMQConnectionService, RabbitMQConnectionService>();
+        
+        // Add workflow message publisher
+        services.AddScoped<IWorkflowMessagePublisher, WorkflowMessagePublisher>();
         
         return services;
     }

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Piranha.AspNetCore.Identity.Data;
 using Piranha.EditorialWorkflow.Models;
 using Piranha.EditorialWorkflow.Services;
+using Piranha.Audit.Events;
 
 namespace Piranha.EditorialWorkflow.Controllers;
 
@@ -322,36 +323,37 @@ public class EditorialWorkflowController : ControllerBase
             if (transitionRule.RequiresComment && string.IsNullOrWhiteSpace(request.Comment))
                 return BadRequest("This transition requires a comment");
 
-            // Get the target state to check if it requires publishing
+            // Get the current and target states for message creation
+            var fromState = await _workflowService.GetWorkflowStateByIdAsync(transitionRule.FromStateId);
             var targetState = await _workflowService.GetWorkflowStateByIdAsync(transitionRule.ToStateId);
-            if (targetState == null)
-                return BadRequest("Target state not found");
+            if (fromState == null || targetState == null)
+                return BadRequest("From state or target state not found");
 
             // Perform the transition - update the current state
             workflowInstance.CurrentStateId = transitionRule.ToStateId;
             workflowInstance.LastModified = DateTime.UtcNow;
-            
+
             var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
-            
+
             if (user == null)
             {
                 _logger.LogWarning("User not found for workflow transition");
                 return Unauthorized("User not found");
             }
-            
+
             // Get user roles and validate against transition rule allowed roles
             var userRoles = await _userManager.GetRolesAsync(user);
-            _logger.LogInformation("User {UserId} ({UserName}) has roles: [{UserRoles}]", 
+            _logger.LogInformation("User {UserId} ({UserName}) has roles: [{UserRoles}]",
                 user.Id, user.UserName ?? user.Email, string.Join(", ", userRoles));
-            _logger.LogInformation("Transition rule {TransitionRuleId} requires roles: {AllowedRoles}", 
+            _logger.LogInformation("Transition rule {TransitionRuleId} requires roles: {AllowedRoles}",
                 transitionRule.Id, transitionRule.AllowedRoles ?? "NULL (no restrictions)");
             _logger.LogInformation("Raw AllowedRoles value: '{RawValue}'", transitionRule.AllowedRoles);
-            
+
             // Check if user has required roles for this transition
             if (!string.IsNullOrWhiteSpace(transitionRule.AllowedRoles))
             {
                 List<string> allowedRoles;
-                
+
                 // Check if AllowedRoles is in JSON array format
                 if (transitionRule.AllowedRoles.TrimStart().StartsWith("["))
                 {
@@ -381,15 +383,15 @@ public class EditorialWorkflowController : ControllerBase
                         .ToList();
                     _logger.LogInformation("Parsed AllowedRoles from comma-separated format");
                 }
-                
+
                 _logger.LogInformation("Final parsed allowed roles: [{ParsedAllowedRoles}]", string.Join(", ", allowedRoles));
-                
+
                 if (allowedRoles.Any())
                 {
                     // Check if user has at least one of the required roles (case-insensitive)
                     var hasRequiredRole = false;
                     string matchingRole = null;
-                    
+
                     foreach (var allowedRole in allowedRoles)
                     {
                         var userRole = userRoles.FirstOrDefault(ur => ur.Equals(allowedRole, StringComparison.OrdinalIgnoreCase));
@@ -410,26 +412,26 @@ public class EditorialWorkflowController : ControllerBase
                         return Unauthorized(
                             $"You do not have permission to perform this transition. Required roles: {string.Join(", ", allowedRoles)}");
                     }
-                    
-                    _logger.LogInformation("AUTHORIZATION SUCCESS: User {UserId} has required role '{MatchingRole}' for transition {TransitionRuleId}", 
+
+                    _logger.LogInformation("AUTHORIZATION SUCCESS: User {UserId} has required role '{MatchingRole}' for transition {TransitionRuleId}",
                         user.Id, matchingRole, transitionRule.Id);
                 }
                 else
                 {
-                    _logger.LogInformation("AllowedRoles contains only empty values - treating as no restrictions for transition {TransitionRuleId}", 
+                    _logger.LogInformation("AllowedRoles contains only empty values - treating as no restrictions for transition {TransitionRuleId}",
                         transitionRule.Id);
                 }
             }
             else
             {
-                _logger.LogInformation("No role restrictions for transition rule {TransitionRuleId} - allowing all authenticated users", 
+                _logger.LogInformation("No role restrictions for transition rule {TransitionRuleId} - allowing all authenticated users",
                     transitionRule.Id);
             }
-            
-            _logger.LogInformation("Transition will be performed by user: {UserName} ({UserId})", 
+
+            _logger.LogInformation("Transition will be performed by user: {UserName} ({UserId})",
                 user.UserName ?? user.Email, user.Id);
 
-            
+
             // Add transition comment to metadata if provided
             if (!string.IsNullOrWhiteSpace(request.Comment))
             {
@@ -461,13 +463,69 @@ public class EditorialWorkflowController : ControllerBase
                 contentPublished = await PublishContentAsync(workflowInstance.ContentId, workflowInstance.ContentType);
             }
 
-            _logger.LogInformation("Workflow transition performed: Instance {InstanceId} moved from state {FromStateId} to {ToStateId}. Content published: {ContentPublished}", 
-                workflowInstanceId, transitionRule.FromStateId, transitionRule.ToStateId, contentPublished);
+            // Send audit message to RabbitMQ on successful transition
+            bool messagePublished = false;
+            try
+            {
+                // Parse contentId to Guid for the message
+                if (Guid.TryParse(workflowInstance.ContentId, out var contentGuid))
+                {
+                    // Create the audit event message
+                    var stateChangedEvent = new WorkflowStateChangedEvent
+                    {
+                        EventId = Guid.NewGuid(),
+                        WorkflowInstanceId = workflowInstance.Id,
+                        ContentId = contentGuid,
+                        ContentType = workflowInstance.ContentType ?? "Unknown",
+                        FromState = fromState.Name,
+                        ToState = targetState.Name,
+                        UserId = user.Id,
+                        Username = user.UserName ?? user.Email ?? "Unknown",
+                        Timestamp = DateTime.UtcNow,
+                        Comments = request.Comment,
+                        TransitionRuleId = transitionRule.Id,
+                        IsAutomaticTransition = false,
+                        Metadata = new Dictionary<string, object>
+                        {
+                            { "transitionDescription", transitionRule.Description ?? "State transition" },
+                            { "approvedBy", user.UserName ?? user.Email ?? "Unknown" },
+                            { "contentName", workflowInstance.ContentTitle ?? "Unknown Content" }
+                        },
+                        Success = true,
+                        ErrorMessage = null
+                    };
+
+                    // Publish the message to RabbitMQ
+                    messagePublished = await _messagePublisher.PublishStateChangedEventAsync(stateChangedEvent);
+
+                    if (messagePublished)
+                    {
+                        _logger.LogInformation("Successfully published workflow state change message for transition {TransitionRuleId}", transitionRule.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to publish workflow state change message for transition {TransitionRuleId}", transitionRule.Id);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Could not parse ContentId {ContentId} as Guid for message publishing", workflowInstance.ContentId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error publishing workflow state change message for transition {TransitionRuleId}", transitionRule.Id);
+                // Don't fail the transition if message publishing fails
+            }
+
+            _logger.LogInformation("Workflow transition performed: Instance {InstanceId} moved from state {FromStateId} to {ToStateId}. Content published: {ContentPublished}, Message published: {MessagePublished}",
+                workflowInstanceId, transitionRule.FromStateId, transitionRule.ToStateId, contentPublished, messagePublished);
 
             return Ok(new
             {
                 workflowInstance = updatedInstance,
                 contentPublished = contentPublished,
+                messagePublished = messagePublished,
                 targetState = new
                 {
                     targetState.Name,
