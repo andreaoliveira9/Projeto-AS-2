@@ -959,7 +959,7 @@ public class EditorialWorkflowController : ControllerBase
                         transitionDescription = "Content rejected and reset to initial state",
                         reviewedBy = userName,
                         approved = false, // Rejection is not an approval
-                        Timestamp = DateTime.UtcNow,
+                        Timestamp = DateTime.UtcNow.AddHours(1),
                         Comments = request?.Comment ?? "Content rejected",
                         Success = true,
                         ErrorMessage = null
