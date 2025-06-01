@@ -101,28 +101,16 @@ public class EditorialWorkflowService : IEditorialWorkflowService
             await _workflowInstanceRepository.Save(workflowInstance);
             _logger.LogInformation("CreateWorkflowInstanceWithContentAsync: Created workflow instance with ID: {WorkflowInstanceId}", workflowInstance.Id);
 
-            // Create or update workflow content extension
-            var existingExtension = await _contentExtensionRepository.GetByContentId(contentId);
-            if (existingExtension != null)
+            // Create workflow content extension (should be new since we delete existing ones first)
+            var workflowContentExtension = new WorkflowContentExtension
             {
-                // Update existing extension
-                existingExtension.CurrentWorkflowInstanceId = workflowInstance.Id;
-                await _contentExtensionRepository.Save(existingExtension);
-                _logger.LogInformation("CreateWorkflowInstanceWithContentAsync: Updated existing workflow content extension for ContentId: {ContentId}", contentId);
-            }
-            else
-            {
-                // Create new extension
-                var workflowContentExtension = new WorkflowContentExtension
-                {
-                    Id = Guid.NewGuid(),
-                    ContentId = contentId,
-                    CurrentWorkflowInstanceId = workflowInstance.Id
-                };
+                Id = Guid.NewGuid(),
+                ContentId = contentId,
+                CurrentWorkflowInstanceId = workflowInstance.Id
+            };
 
-                await _contentExtensionRepository.Save(workflowContentExtension);
-                _logger.LogInformation("CreateWorkflowInstanceWithContentAsync: Created new workflow content extension for ContentId: {ContentId}", contentId);
-            }
+            await _contentExtensionRepository.Save(workflowContentExtension);
+            _logger.LogInformation("CreateWorkflowInstanceWithContentAsync: Created workflow content extension for ContentId: {ContentId}", contentId);
 
             _logger.LogInformation("CreateWorkflowInstanceWithContentAsync: Successfully created workflow instance and content extension for ContentId: {ContentId}", contentId);
             return workflowInstance;
@@ -330,6 +318,52 @@ public class EditorialWorkflowService : IEditorialWorkflowService
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetWorkflowContentExtensionAsync: Error retrieving workflow content extension for ContentId: {ContentId}", contentId);
+            throw;
+        }
+    }
+
+    // NEW METHOD - Delete WorkflowInstance
+    public async Task DeleteWorkflowInstanceAsync(Guid workflowInstanceId)
+    {
+        _logger.LogInformation("DeleteWorkflowInstanceAsync: Deleting workflow instance with ID: {WorkflowInstanceId}", workflowInstanceId);
+        
+        try
+        {
+            if (workflowInstanceId == Guid.Empty)
+            {
+                _logger.LogWarning("DeleteWorkflowInstanceAsync: WorkflowInstanceId is empty");
+                throw new ArgumentException("WorkflowInstanceId cannot be empty", nameof(workflowInstanceId));
+            }
+
+            await _workflowInstanceRepository.Delete(workflowInstanceId);
+            _logger.LogInformation("DeleteWorkflowInstanceAsync: Successfully deleted workflow instance {WorkflowInstanceId}", workflowInstanceId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "DeleteWorkflowInstanceAsync: Error deleting workflow instance {WorkflowInstanceId}", workflowInstanceId);
+            throw;
+        }
+    }
+
+    // NEW METHOD - Delete WorkflowContentExtension
+    public async Task DeleteWorkflowContentExtensionAsync(string contentId)
+    {
+        _logger.LogInformation("DeleteWorkflowContentExtensionAsync: Deleting workflow content extension for ContentId: {ContentId}", contentId);
+        
+        try
+        {
+            if (string.IsNullOrWhiteSpace(contentId))
+            {
+                _logger.LogWarning("DeleteWorkflowContentExtensionAsync: ContentId is null or empty");
+                throw new ArgumentException("ContentId cannot be null or empty", nameof(contentId));
+            }
+
+            await _contentExtensionRepository.Delete(contentId);
+            _logger.LogInformation("DeleteWorkflowContentExtensionAsync: Successfully deleted workflow content extension for ContentId: {ContentId}", contentId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "DeleteWorkflowContentExtensionAsync: Error deleting workflow content extension for ContentId: {ContentId}", contentId);
             throw;
         }
     }

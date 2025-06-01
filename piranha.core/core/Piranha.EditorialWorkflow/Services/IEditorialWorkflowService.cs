@@ -42,6 +42,8 @@ public interface IEditorialWorkflowService
     Task<Piranha.EditorialWorkflow.Models.WorkflowContentExtension> GetWorkflowContentExtensionAsync(string contentId);
     Task<WorkflowInstance> CreateWorkflowInstanceWithContentAsync(string contentId, Guid workflowDefinitionId, string contentType = null, string contentTitle = null);
     Task<IEnumerable<WorkflowContentExtension>> GetWorkflowContentExtensionsByDefinitionAsync(Guid workflowDefinitionId);
+    Task DeleteWorkflowInstanceAsync(Guid workflowInstanceId);
+    Task DeleteWorkflowContentExtensionAsync(string contentId);
 
     // Debug methods
     Task<bool> TestDatabaseConnectionAsync();

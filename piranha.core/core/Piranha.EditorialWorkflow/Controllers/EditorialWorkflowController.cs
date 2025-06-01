@@ -478,9 +478,32 @@ public class EditorialWorkflowController : ControllerBase
             if (page == null)
                 return NotFound("Page not found");
 
+            string contentId = pageId.ToString();
+
+            // Check for existing workflow entries and delete them if found
+            var existingContentExtension = await _workflowService.GetWorkflowContentExtensionAsync(contentId);
+            if (existingContentExtension != null)
+            {
+                _logger.LogInformation("Found existing WorkflowContentExtension for page {PageId}, deleting it", pageId);
+                
+                // If there's an active workflow instance, delete it first
+                if (existingContentExtension.CurrentWorkflowInstanceId.HasValue)
+                {
+                    var existingInstance = await _workflowService.GetWorkflowInstanceByIdAsync(existingContentExtension.CurrentWorkflowInstanceId.Value);
+                    if (existingInstance != null)
+                    {
+                        _logger.LogInformation("Found existing WorkflowInstance {InstanceId} for page {PageId}, deleting it", existingInstance.Id, pageId);
+                        await _workflowService.DeleteWorkflowInstanceAsync(existingInstance.Id);
+                    }
+                }
+                
+                // Delete the WorkflowContentExtension
+                await _workflowService.DeleteWorkflowContentExtensionAsync(contentId);
+            }
+
             // Create workflow instance for the page
             var workflowInstance = await _workflowService.CreateWorkflowInstanceWithContentAsync(
-                pageId.ToString(),
+                contentId,
                 request.WorkflowDefinitionId,
                 "page",
                 page.Title);
@@ -492,7 +515,8 @@ public class EditorialWorkflowController : ControllerBase
                 workflowInstanceId = workflowInstance.Id,
                 pageId = pageId,
                 pageTitle = page.Title,
-                workflowDefinitionId = request.WorkflowDefinitionId
+                workflowDefinitionId = request.WorkflowDefinitionId,
+                replacedExisting = existingContentExtension != null
             });
         }
         catch (Exception ex)
