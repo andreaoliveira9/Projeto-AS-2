@@ -2,7 +2,7 @@
 @inject ManagerLocalizer Localizer
 @{
     ViewBag.Title = "Workflow Instances";
-    ViewBag.MenuItem = "Pages";
+    ViewBag.MenuItem = "WorkflowInstances";
 }
 @section script
 {
@@ -19,7 +19,13 @@
                 workflowDefinitions: {},
                 editingInstance: null,
                 editModal: false,
-                error: null
+                error: null,
+                statusMap: {
+                    1: 'Active',
+                    2: 'Completed', 
+                    3: 'Cancelled',
+                    4: 'OnHold'
+                }
             },
             methods: {
                 // Load all workflow instances (not user-filtered)
@@ -42,6 +48,7 @@
                     })
                     .then(function(data) {
                         self.instances = data || [];
+                        console.log('Loaded instances:', self.instances);
                         self.loadWorkflowDefinitions();
                     })
                     .catch(function(error) {
@@ -68,6 +75,7 @@
                         definitions.forEach(function(def) {
                             self.$set(self.workflowDefinitions, def.id, def);
                         });
+                        console.log('Loaded workflow definitions:', self.workflowDefinitions);
                         self.loading = false;
                     })
                     .catch(function(error) {
@@ -79,6 +87,8 @@
                 // Open edit modal
                 editInstance: function(instance) {
                     this.editingInstance = JSON.parse(JSON.stringify(instance)); // Deep copy
+                    // Convert status number to string for editing
+                    this.editingInstance.statusString = this.getStatusString(instance.status);
                     this.editModal = true;
                 },
                 
@@ -88,12 +98,18 @@
                     
                     if (!self.editingInstance) return;
                     
+                    // Convert status string back to number
+                    var statusNumber = Object.keys(self.statusMap).find(key => self.statusMap[key] === self.editingInstance.statusString);
+                    var updateData = JSON.parse(JSON.stringify(self.editingInstance));
+                    updateData.status = parseInt(statusNumber);
+                    delete updateData.statusString; // Remove the helper property
+                    
                     fetch('/api/workflow/workflow-instances/' + self.editingInstance.id, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(self.editingInstance)
+                        body: JSON.stringify(updateData)
                     })
                     .then(function(response) {
                         if (!response.ok) {
@@ -139,9 +155,15 @@
                     return new Date(dateString).toLocaleString();
                 },
                 
+                // Get status string from number
+                getStatusString: function(statusNumber) {
+                    return this.statusMap[statusNumber] || 'Unknown';
+                },
+                
                 // Get status badge class
                 getStatusClass: function(status) {
-                    switch (status) {
+                    var statusString = typeof status === 'number' ? this.getStatusString(status) : status;
+                    switch (statusString) {
                         case 'Active': return 'badge-success';
                         case 'Completed': return 'badge-primary';
                         case 'Cancelled': return 'badge-danger';
@@ -168,8 +190,8 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item">@Localizer.Menu["System"]</li>
-                <li class="breadcrumb-item">@Localizer.Menu["Editorial Workflows"]</li>
-                <li class="breadcrumb-item active" aria-current="page">Workflow Instances</li>
+                <li class="breadcrumb-item">Editorial Workflows</li>
+                <li class="breadcrumb-item active" aria-current="page">Instances</li>
             </ol>
         </nav>
 
@@ -245,7 +267,7 @@
                                         <td>{{ getWorkflowDefinitionName(instance.workflowDefinitionId) }}</td>
                                         <td>
                                             <span class="badge" :class="getStatusClass(instance.status)">
-                                                {{ instance.status }}
+                                                {{ getStatusString(instance.status) }}
                                             </span>
                                         </td>
                                         <td>
@@ -316,7 +338,7 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label>Status</label>
-                                    <select class="form-control" v-model="editingInstance.status">
+                                    <select class="form-control" v-model="editingInstance.statusString">
                                         <option value="Active">Active</option>
                                         <option value="Completed">Completed</option>
                                         <option value="Cancelled">Cancelled</option>

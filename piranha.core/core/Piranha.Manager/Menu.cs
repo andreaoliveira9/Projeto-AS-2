@@ -92,28 +92,19 @@ public static class Menu
                 },
                 new MenuItem
                 {
-                    InternalId = "EditorialWorkflows",
+                    InternalId = "WorkflowList",
                     Name = "Editorial Workflows",
-                    Css = "fas fa-project-diagram",
-                    Items = new MenuItemList
-                    {
-                        new MenuItem
-                        {
-                            InternalId = "WorkflowList",
-                            Name = "Workflows",
-                            Route = "~/manager/workflows",
-                            Policy = Permission.Workflows,
-                            Css = "fas fa-sitemap"
-                        },
-                        new MenuItem
-                        {
-                            InternalId = "WorkflowInstances",
-                            Name = "Instances",
-                            Route = "~/manager/workflow-instances",
-                            Policy = Permission.Workflows,
-                            Css = "fas fa-tasks"
-                        }
-                    }
+                    Route = "~/manager/workflows",
+                    Policy = Permission.Workflows,
+                    Css = "fas fa-sitemap"
+                },
+                new MenuItem
+                {
+                    InternalId = "WorkflowInstances",
+                    Name = "Workflow Instances",
+                    Route = "~/manager/workflow-instances",
+                    Policy = Permission.Workflows,
+                    Css = "fas fa-tasks"
                 }
             }
         }
