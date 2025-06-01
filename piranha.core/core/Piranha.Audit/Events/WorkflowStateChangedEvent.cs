@@ -19,24 +19,14 @@ namespace Piranha.Audit.Events;
 public sealed class WorkflowStateChangedEvent
 {
     /// <summary>
-    /// Gets/sets the event id.
-    /// </summary>
-    public Guid EventId { get; set; } = Guid.NewGuid();
-
-    /// <summary>
-    /// Gets/sets the workflow instance id.
-    /// </summary>
-    public Guid WorkflowInstanceId { get; set; }
-
-    /// <summary>
     /// Gets/sets the content id.
     /// </summary>
     public Guid ContentId { get; set; }
 
     /// <summary>
-    /// Gets/sets the content type.
+    /// Gets/sets the content type (e.g., "Page", "Post").
     /// </summary>
-    public string ContentType { get; set; } = string.Empty;
+    public string ContentName { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the previous state.
@@ -49,39 +39,24 @@ public sealed class WorkflowStateChangedEvent
     public string ToState { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the user who triggered the state change.
+    /// Gets/sets the transition rule id that triggered this change.
     /// </summary>
-    public string UserId { get; set; } = string.Empty;
+    public string transitionDescription { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the username for quick reference.
     /// </summary>
-    public string Username { get; set; } = string.Empty;
+    public string approvedBy { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets when the state change occurred.
     /// </summary>
     public DateTime Timestamp { get; set; }
-    
+
     /// <summary>
     /// Gets/sets optional comments.
     /// </summary>
     public string? Comments { get; set; }
-
-    /// <summary>
-    /// Gets/sets the transition rule id.
-    /// </summary>
-    public Guid? TransitionRuleId { get; set; }
-
-    /// <summary>
-    /// Gets/sets whether the transition was automatic.
-    /// </summary>
-    public bool IsAutomaticTransition { get; set; }
-
-    /// <summary>
-    /// Gets/sets additional metadata.
-    /// </summary>
-    public Dictionary<string, object> Metadata { get; set; } = new();
 
     /// <summary>
     /// Gets/sets whether the action was successful.

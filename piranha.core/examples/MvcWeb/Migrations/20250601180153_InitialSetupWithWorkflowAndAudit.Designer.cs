@@ -11,7 +11,7 @@ using MvcWeb.Data;
 namespace MvcWeb.Migrations
 {
     [DbContext(typeof(SQLiteModulesDb))]
-    [Migration("20250530230102_InitialSetupWithWorkflowAndAudit")]
+    [Migration("20250601180153_InitialSetupWithWorkflowAndAudit")]
     partial class InitialSetupWithWorkflowAndAudit
     {
         /// <inheritdoc />
@@ -69,9 +69,9 @@ namespace MvcWeb.Migrations
                     b.Property<Guid>("ContentId")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ContentType")
+                    b.Property<string>("ContentName")
                         .IsRequired()
-                        .HasMaxLength(50)
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ErrorMessage")
@@ -79,10 +79,8 @@ namespace MvcWeb.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FromState")
+                        .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Metadata")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("Success")
@@ -98,19 +96,14 @@ namespace MvcWeb.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("TransitionRuleId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("UserId")
+                    b.Property<string>("approvedBy")
                         .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Username")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("WorkflowInstanceId")
+                    b.Property<string>("transitionDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -121,11 +114,7 @@ namespace MvcWeb.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.HasIndex("TransitionRuleId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("WorkflowInstanceId");
+                    b.HasIndex("approvedBy");
 
                     b.HasIndex("ContentId", "Timestamp");
 

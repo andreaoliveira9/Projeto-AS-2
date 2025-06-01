@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 namespace Piranha.Audit.Configuration;
 
 /// <summary>

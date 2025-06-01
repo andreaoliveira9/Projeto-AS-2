@@ -8,110 +8,101 @@
  *
  */
 
+#nullable enable
+
 using Microsoft.EntityFrameworkCore;
 using Piranha.Audit.Repositories;
 
-namespace Piranha.Repositories.Audit
+namespace Piranha.Repositories.Audit;
+/// <summary>
+/// Entity Framework implementation of the state change record repository.
+/// Focused on saving audit records and retrieving by content.
+/// </summary>
+public sealed class StateChangeRecordRepository : IStateChangeRecordRepository
 {
-    /// <summary>
-    /// Entity Framework implementation of the state change record repository.
-    /// Focused on saving audit records and retrieving by content.
-    /// </summary>
-    public sealed class StateChangeRecordRepository : IStateChangeRecordRepository
+    private readonly IDb _db;
+
+    public StateChangeRecordRepository(IDb db)
     {
-        private readonly IDb _db;
+        _db = db;
+    }
 
-        public StateChangeRecordRepository(IDb db)
+    /// <inheritdoc />
+    public async Task<IEnumerable<Piranha.Audit.Models.StateChangeRecord>> GetByContentAsync(Guid contentId)
+    {
+        var entities = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
+            .Where(x => x.ContentId == contentId)
+            .OrderBy(x => x.Timestamp)
+            .ToListAsync();
+
+        return entities.Select(Transform);
+    }
+
+    /// <inheritdoc />
+    public async Task SaveAsync(Piranha.Audit.Models.StateChangeRecord stateChangeRecord)
+    {
+        var entity = Transform(stateChangeRecord);
+        
+        var existing = await _db.Set<Piranha.Data.Audit.StateChangeRecord>().FirstOrDefaultAsync(x => x.Id == entity.Id);
+        if (existing != null)
         {
-            _db = db;
+            // Update existing
+            existing.ContentId = entity.ContentId;
+            existing.ContentName = entity.ContentName;
+            existing.FromState = entity.FromState;
+            existing.ToState = entity.ToState;
+            existing.transitionDescription = entity.transitionDescription;
+            existing.approvedBy = entity.approvedBy;
+            existing.Timestamp = entity.Timestamp;
+            existing.Comments = entity.Comments;
+            existing.Success = entity.Success;
+            existing.ErrorMessage = entity.ErrorMessage;
+        }
+        else
+        {
+            // Add new
+            _db.Set<Piranha.Data.Audit.StateChangeRecord>().Add(entity);
         }
 
-        /// <inheritdoc />
-        public async Task<IEnumerable<Piranha.Audit.Models.StateChangeRecord>> GetByContentAsync(Guid contentId)
+        if (_db is DbContext dbContext)
         {
-            var entities = await _db.Set<Piranha.Data.Audit.StateChangeRecord>()
-                .Where(x => x.ContentId == contentId)
-                .OrderBy(x => x.Timestamp)
-                .ToListAsync();
-
-            return entities.Select(Transform);
+            await dbContext.SaveChangesAsync();
         }
+    }
 
-        /// <inheritdoc />
-        public async Task SaveAsync(Piranha.Audit.Models.StateChangeRecord stateChangeRecord)
+    private static Piranha.Audit.Models.StateChangeRecord Transform(Data.Audit.StateChangeRecord model)
+    {
+        return new Piranha.Audit.Models.StateChangeRecord
         {
-            var entity = Transform(stateChangeRecord);
-            
-            var existing = await _db.Set<Piranha.Data.Audit.StateChangeRecord>().FirstOrDefaultAsync(x => x.Id == entity.Id);
-            if (existing != null)
-            {
-                // Update existing
-                existing.WorkflowInstanceId = entity.WorkflowInstanceId;
-                existing.ContentId = entity.ContentId;
-                existing.ContentType = entity.ContentType;
-                existing.FromState = entity.FromState;
-                existing.ToState = entity.ToState;
-                existing.UserId = entity.UserId;
-                existing.Username = entity.Username;
-                existing.Timestamp = entity.Timestamp;
-                existing.Comments = entity.Comments;
-                existing.TransitionRuleId = entity.TransitionRuleId;
-                existing.Metadata = entity.Metadata;
-                existing.Success = entity.Success;
-                existing.ErrorMessage = entity.ErrorMessage;
-            }
-            else
-            {
-                // Add new
-                _db.Set<Piranha.Data.Audit.StateChangeRecord>().Add(entity);
-            }
+            Id = model.Id,
+            ContentId = model.ContentId,
+            ContentName = model.ContentName,
+            FromState = model.FromState,
+            ToState = model.ToState,
+            transitionDescription = model.transitionDescription,
+            approvedBy = model.approvedBy,
+            Timestamp = model.Timestamp,
+            Comments = model.Comments,
+            Success = model.Success,
+            ErrorMessage = model.ErrorMessage
+        };
+    }
 
-            if (_db is DbContext dbContext)
-            {
-                await dbContext.SaveChangesAsync();
-            }
-        }
-
-        private static Piranha.Audit.Models.StateChangeRecord Transform(Data.Audit.StateChangeRecord model)
+    private static Piranha.Data.Audit.StateChangeRecord Transform(Piranha.Audit.Models.StateChangeRecord model)
+    {
+        return new Piranha.Data.Audit.StateChangeRecord
         {
-            return new Piranha.Audit.Models.StateChangeRecord
-            {
-                Id = model.Id,
-                WorkflowInstanceId = model.WorkflowInstanceId,
-                ContentId = model.ContentId,
-                ContentType = model.ContentType,
-                FromState = model.FromState,
-                ToState = model.ToState,
-                UserId = model.UserId,
-                Username = model.Username,
-                Timestamp = model.Timestamp,
-                Comments = model.Comments,
-                TransitionRuleId = model.TransitionRuleId,
-                Metadata = model.Metadata,
-                Success = model.Success,
-                ErrorMessage = model.ErrorMessage
-            };
-        }
-
-        private static Piranha.Data.Audit.StateChangeRecord Transform(Piranha.Audit.Models.StateChangeRecord model)
-        {
-            return new Piranha.Data.Audit.StateChangeRecord
-            {
-                Id = model.Id,
-                WorkflowInstanceId = model.WorkflowInstanceId,
-                ContentId = model.ContentId,
-                ContentType = model.ContentType,
-                FromState = model.FromState,
-                ToState = model.ToState,
-                UserId = model.UserId,
-                Username = model.Username,
-                Timestamp = model.Timestamp,
-                Comments = model.Comments,
-                TransitionRuleId = model.TransitionRuleId,
-                Metadata = model.Metadata,
-                Success = model.Success,
-                ErrorMessage = model.ErrorMessage
-            };
-        }
+            Id = model.Id,
+            ContentId = model.ContentId,
+            ContentName = model.ContentName,
+            FromState = model.FromState,
+            ToState = model.ToState,
+            transitionDescription = model.transitionDescription,
+            approvedBy = model.approvedBy,
+            Timestamp = model.Timestamp,
+            Comments = model.Comments,
+            Success = model.Success,
+            ErrorMessage = model.ErrorMessage
+        };
     }
 }

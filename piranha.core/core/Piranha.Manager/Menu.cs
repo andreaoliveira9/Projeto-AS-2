@@ -96,7 +96,15 @@ public static class Menu
                     Name = "Editorial Workflows",
                     Route = "~/manager/workflows",
                     Policy = Permission.Workflows,
-                    Css = "fas fa-project-diagram"
+                    Css = "fas fa-sitemap"
+                },
+                new MenuItem
+                {
+                    InternalId = "WorkflowInstances",
+                    Name = "Workflow Instances",
+                    Route = "~/manager/workflow-instances",
+                    Policy = Permission.Workflows,
+                    Css = "fas fa-tasks"
                 }
             }
         }

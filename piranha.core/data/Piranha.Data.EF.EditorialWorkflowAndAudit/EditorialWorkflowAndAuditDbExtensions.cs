@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Piranha.Data.EditorialWorkflowAndAudit;
@@ -179,28 +181,23 @@ public static class EditorialWorkflowAndAuditDbExtensions
         // StateChangeRecord configuration
         var stateChangeRecord = modelBuilder.Entity<StateChangeRecord>();
         stateChangeRecord.HasKey(s => s.Id);
-        stateChangeRecord.Property(s => s.WorkflowInstanceId).IsRequired();
         stateChangeRecord.Property(s => s.ContentId).IsRequired();
-        stateChangeRecord.Property(s => s.ContentType).IsRequired().HasMaxLength(50);
-        stateChangeRecord.Property(s => s.FromState).HasMaxLength(100);
+        stateChangeRecord.Property(s => s.ContentName).IsRequired().HasMaxLength(100);
+        stateChangeRecord.Property(s => s.FromState).IsRequired().HasMaxLength(100);
         stateChangeRecord.Property(s => s.ToState).IsRequired().HasMaxLength(100);
-        stateChangeRecord.Property(s => s.UserId).IsRequired().HasMaxLength(450);
-        stateChangeRecord.Property(s => s.Username).HasMaxLength(256);
+        stateChangeRecord.Property(s => s.transitionDescription).IsRequired().HasMaxLength(500);
+        stateChangeRecord.Property(s => s.approvedBy).IsRequired().HasMaxLength(256);
         stateChangeRecord.Property(s => s.Timestamp).IsRequired();
         stateChangeRecord.Property(s => s.Comments).HasMaxLength(1000);
-        stateChangeRecord.Property(s => s.TransitionRuleId);
-        stateChangeRecord.Property(s => s.Metadata).HasColumnType("TEXT");
         stateChangeRecord.Property(s => s.Success).IsRequired().HasDefaultValue(true);
         stateChangeRecord.Property(s => s.ErrorMessage).HasMaxLength(2000);
 
         // Indexes for better query performance
-        stateChangeRecord.HasIndex(s => s.WorkflowInstanceId);
         stateChangeRecord.HasIndex(s => s.ContentId);
         stateChangeRecord.HasIndex(s => new { s.ContentId, s.Timestamp });
-        stateChangeRecord.HasIndex(s => s.UserId);
+        stateChangeRecord.HasIndex(s => s.approvedBy);
         stateChangeRecord.HasIndex(s => s.Timestamp);
         stateChangeRecord.HasIndex(s => new { s.FromState, s.ToState });
-        stateChangeRecord.HasIndex(s => s.TransitionRuleId);
         stateChangeRecord.HasIndex(s => s.Success);
     }
 }
