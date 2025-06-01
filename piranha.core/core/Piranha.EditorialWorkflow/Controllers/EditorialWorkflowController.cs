@@ -532,6 +532,7 @@ public class EditorialWorkflowController : ControllerBase
             _logger.LogInformation("Transition will be performed by user: {UserName} ({UserId})",
                 user.UserName ?? user.Email, user.Id);
 
+            
             // Add transition comment to metadata if provided
             if (!string.IsNullOrWhiteSpace(request.Comment))
             {
@@ -587,7 +588,7 @@ public class EditorialWorkflowController : ControllerBase
                         transitionDescription = transitionRule.Description ?? "Content approved for next state",
                         reviewedBy = user.UserName ?? user.Email ?? "Unknown",
                         approved = true, // Normal transitions are considered approvals
-                        Timestamp = DateTime.UtcNow,
+                        Timestamp = DateTime.UtcNow.AddHours(1),
                         Comments = request.Comment,
                         Success = true,
                         ErrorMessage = null
@@ -1250,7 +1251,7 @@ public class EditorialWorkflowController : ControllerBase
         {
             return NotFound(ex.Message);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return StatusCode(500, "An error occurred while updating the workflow instance");
         }

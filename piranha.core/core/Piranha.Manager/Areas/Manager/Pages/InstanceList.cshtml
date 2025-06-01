@@ -639,17 +639,23 @@
                                         </td>
                                         <td>
                                             <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-outline-primary" 
+                                                <a class="btn btn-sm btn-outline-info"
+                                                   :href="'/manager/page/preview/' + instance.contentId"
+                                                   target="_blank"
+                                                   title="Preview Content">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <button class="btn btn-sm btn-outline-primary"
                                                         v-on:click="editInstance(instance)"
                                                         title="Edit Instance">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-success" 
+                                                <button class="btn btn-sm btn-outline-success"
                                                         v-on:click="openTransitionModal(instance)"
                                                         title="Transition to Next State">
                                                     <i class="fas fa-arrow-right"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-danger" 
+                                                <button class="btn btn-sm btn-outline-danger"
                                                         v-on:click="deleteInstance(instance)"
                                                         title="Delete Instance">
                                                     <i class="fas fa-trash"></i>
