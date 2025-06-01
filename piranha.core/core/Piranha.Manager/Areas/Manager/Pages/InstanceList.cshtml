@@ -238,8 +238,21 @@
                     })
                     .then(function(response) {
                         if (!response.ok) {
-                            throw new Error('Failed to perform transition');
-                        }
+                            if (response.status === 401) {
+                                piranha.notifications.push({
+                                    body: "You do not have permission to perform this transition",
+                                    type: "warning",
+                                    hide: true
+                                });
+                                return;
+                            } else {
+                                piranha.notifications.push({
+                                    body: "Failed to perform workflow transition",
+                                    type: "danger",
+                                    hide: true
+                                });
+                            }
+                        } 
                         return response.json();
                     })
                     .then(function(updatedInstance) {
@@ -260,14 +273,6 @@
                             hide: true
                         });
                     })
-                    .catch(function(error) {
-                        console.error('Error performing transition:', error);
-                        piranha.notifications.push({
-                            body: "Failed to perform workflow transition",
-                            type: "danger",
-                            hide: true
-                        });
-                    });
                 },
                 
                 // Update workflow instance

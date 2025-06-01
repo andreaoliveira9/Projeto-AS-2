@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Piranha.AspNetCore.Identity.Data;
 using Piranha.EditorialWorkflow.Models;
 using Piranha.EditorialWorkflow.Services;
 
@@ -15,15 +17,21 @@ public class EditorialWorkflowController : ControllerBase
     private readonly IEditorialWorkflowService _workflowService;
     private readonly ILogger<EditorialWorkflowController> _logger;
     private readonly IApi _api;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly UserManager<User> _userManager;
 
     public EditorialWorkflowController(
-        IEditorialWorkflowService workflowService, 
+        IEditorialWorkflowService workflowService,
         ILogger<EditorialWorkflowController> logger,
-        IApi api)
+        IApi api,
+        IHttpContextAccessor httpContextAccessor,
+        UserManager<User> userManager)
     {
         _workflowService = workflowService;
         _logger = logger;
         _api = api;
+        _httpContextAccessor = httpContextAccessor;
+        _userManager = userManager;
     }
 
     #region Request Models
@@ -322,7 +330,106 @@ public class EditorialWorkflowController : ControllerBase
             // Perform the transition - update the current state
             workflowInstance.CurrentStateId = transitionRule.ToStateId;
             workflowInstance.LastModified = DateTime.UtcNow;
+            
+            var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
+            
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for workflow transition");
+                return Unauthorized("User not found");
+            }
+            
+            // Get user roles and validate against transition rule allowed roles
+            var userRoles = await _userManager.GetRolesAsync(user);
+            _logger.LogInformation("User {UserId} ({UserName}) has roles: [{UserRoles}]", 
+                user.Id, user.UserName ?? user.Email, string.Join(", ", userRoles));
+            _logger.LogInformation("Transition rule {TransitionRuleId} requires roles: {AllowedRoles}", 
+                transitionRule.Id, transitionRule.AllowedRoles ?? "NULL (no restrictions)");
+            _logger.LogInformation("Raw AllowedRoles value: '{RawValue}'", transitionRule.AllowedRoles);
+            
+            // Check if user has required roles for this transition
+            if (!string.IsNullOrWhiteSpace(transitionRule.AllowedRoles))
+            {
+                List<string> allowedRoles;
+                
+                // Check if AllowedRoles is in JSON array format
+                if (transitionRule.AllowedRoles.TrimStart().StartsWith("["))
+                {
+                    try
+                    {
+                        // Parse as JSON array
+                        var jsonRoles = System.Text.Json.JsonSerializer.Deserialize<string[]>(transitionRule.AllowedRoles);
+                        allowedRoles = jsonRoles?.Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r.Trim()).ToList() ?? new List<string>();
+                        _logger.LogInformation("Parsed AllowedRoles from JSON array format");
+                    }
+                    catch (System.Text.Json.JsonException ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to parse AllowedRoles as JSON, falling back to comma-separated parsing");
+                        // Fallback to comma-separated parsing
+                        allowedRoles = transitionRule.AllowedRoles.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(r => r.Trim())
+                            .Where(r => !string.IsNullOrEmpty(r))
+                            .ToList();
+                    }
+                }
+                else
+                {
+                    // Parse as comma-separated string
+                    allowedRoles = transitionRule.AllowedRoles.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(r => r.Trim())
+                        .Where(r => !string.IsNullOrEmpty(r))
+                        .ToList();
+                    _logger.LogInformation("Parsed AllowedRoles from comma-separated format");
+                }
+                
+                _logger.LogInformation("Final parsed allowed roles: [{ParsedAllowedRoles}]", string.Join(", ", allowedRoles));
+                
+                if (allowedRoles.Any())
+                {
+                    // Check if user has at least one of the required roles (case-insensitive)
+                    var hasRequiredRole = false;
+                    string matchingRole = null;
+                    
+                    foreach (var allowedRole in allowedRoles)
+                    {
+                        var userRole = userRoles.FirstOrDefault(ur => ur.Equals(allowedRole, StringComparison.OrdinalIgnoreCase));
+                        if (userRole != null)
+                        {
+                            hasRequiredRole = true;
+                            matchingRole = userRole;
+                            _logger.LogInformation("User has matching role: '{UserRole}' matches required '{AllowedRole}'", userRole, allowedRole);
+                            break;
+                        }
+                    }
 
+                    if (!hasRequiredRole)
+                    {
+                        _logger.LogWarning("AUTHORIZATION FAILED: User {UserId} with roles [{UserRoles}] does not have any of the required roles [{RequiredRoles}] for transition {TransitionRuleId}",
+                            user.Id, string.Join(", ", userRoles), string.Join(", ", allowedRoles), transitionRule.Id);
+
+                        return Unauthorized(
+                            $"You do not have permission to perform this transition. Required roles: {string.Join(", ", allowedRoles)}");
+                    }
+                    
+                    _logger.LogInformation("AUTHORIZATION SUCCESS: User {UserId} has required role '{MatchingRole}' for transition {TransitionRuleId}", 
+                        user.Id, matchingRole, transitionRule.Id);
+                }
+                else
+                {
+                    _logger.LogInformation("AllowedRoles contains only empty values - treating as no restrictions for transition {TransitionRuleId}", 
+                        transitionRule.Id);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("No role restrictions for transition rule {TransitionRuleId} - allowing all authenticated users", 
+                    transitionRule.Id);
+            }
+            
+            _logger.LogInformation("Transition will be performed by user: {UserName} ({UserId})", 
+                user.UserName ?? user.Email, user.Id);
+
+            
             // Add transition comment to metadata if provided
             if (!string.IsNullOrWhiteSpace(request.Comment))
             {
@@ -333,14 +440,14 @@ public class EditorialWorkflowController : ControllerBase
                     toStateId = transitionRule.ToStateId,
                     transitionRuleId = transitionRule.Id,
                     comment = request.Comment,
-                    performedBy = "current_user" // You might want to get this from the authentication context
+                    performedBy = user.UserName
                 };
 
                 // Update metadata with transition log
                 var metadata = string.IsNullOrWhiteSpace(workflowInstance.Metadata) ? "{}" : workflowInstance.Metadata;
                 // Simple append - in production you might want to parse JSON and add to an array
-                workflowInstance.Metadata = metadata.TrimEnd('}') + 
-                    (metadata == "{}" ? "" : ",") + 
+                workflowInstance.Metadata = metadata.TrimEnd('}') +
+                    (metadata == "{}" ? "" : ",") +
                     $"\"lastTransition\":{System.Text.Json.JsonSerializer.Serialize(transitionLog)}}}";
             }
 
@@ -740,7 +847,6 @@ public class EditorialWorkflowController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(contentId))
             return BadRequest("ContentId is required");
-
         var exists = await _workflowService.WorkflowContentExtensionExistsAsync(contentId);
         return Ok(exists);
     }
