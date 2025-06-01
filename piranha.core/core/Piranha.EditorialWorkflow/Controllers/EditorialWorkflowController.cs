@@ -1191,7 +1191,7 @@ public class EditorialWorkflowController : ControllerBase
         {
             return NotFound(ex.Message);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return StatusCode(500, "An error occurred while updating the workflow instance");
         }
