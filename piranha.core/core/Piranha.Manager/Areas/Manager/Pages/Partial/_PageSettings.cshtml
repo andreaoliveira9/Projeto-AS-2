@@ -1,5 +1,143 @@
 @inject ManagerLocalizer Localizer
 
+<script>
+// Workflow assignment functionality
+if (typeof window.handleWorkflowChange === 'undefined') {
+    window.handleWorkflowChange = function(event) {
+        // Get workflowId from the event target or from Vue model
+        var workflowId = null;
+        
+        if (event && event.target && event.target.value) {
+            workflowId = event.target.value;
+        } else if (window.piranha && window.piranha.pageedit && window.piranha.pageedit.model && window.piranha.pageedit.model.selectedWorkflow) {
+            workflowId = window.piranha.pageedit.model.selectedWorkflow;
+        }
+        
+        // Get page ID from multiple sources
+        var pageId = null;
+        
+        // Method 1: Try to get from piranha.pageedit.model
+        if (window.piranha && window.piranha.pageedit && window.piranha.pageedit.model && window.piranha.pageedit.model.id) {
+            pageId = window.piranha.pageedit.model.id;
+        }
+        
+        // Method 2: Extract from URL if not available from model
+        if (!pageId) {
+            var pathParts = window.location.pathname.split('/');
+            var editIndex = pathParts.indexOf('edit');
+            if (editIndex !== -1 && pathParts[editIndex + 1]) {
+                var possibleId = pathParts[editIndex + 1];
+                // Check if it looks like a GUID
+                var guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                if (guidRegex.test(possibleId)) {
+                    pageId = possibleId;
+                }
+            }
+        }
+        
+        console.log('Workflow change detected - workflowId:', workflowId, 'pageId:', pageId, 'URL:', window.location.pathname);
+        
+        if (!workflowId || !pageId) {
+            console.warn('Missing workflowId or pageId for workflow assignment', { workflowId: workflowId, pageId: pageId, url: window.location.pathname });
+            if (!pageId) {
+                showWorkflowMessage('Error: Unable to determine page ID. Please save the page first.', 'error');
+            }
+            return;
+        }
+        
+        console.log('Assigning workflow', workflowId, 'to page', pageId);
+        
+        // Show loading message using DOM manipulation instead of Vue model
+        showWorkflowMessage('Assigning workflow...', 'info');
+        
+        // Make API call to assign workflow
+        fetch('/api/workflow/assign-workflow-to-page/' + pageId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                workflowDefinitionId: workflowId
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            console.log('Workflow assigned successfully:', data);
+            showWorkflowMessage('Workflow assigned successfully!', 'success');
+            
+            // Clear success message after 5 seconds
+            setTimeout(function() {
+                hideWorkflowMessage();
+            }, 5000);
+        })
+        .catch(function(error) {
+            console.error('Failed to assign workflow:', error);
+            showWorkflowMessage('Failed to assign workflow: ' + error.message, 'error');
+            
+            // Clear error message after 10 seconds
+            setTimeout(function() {
+                hideWorkflowMessage();
+            }, 10000);
+        });
+    };
+    
+    // Helper functions to show/hide messages using DOM manipulation
+    window.showWorkflowMessage = function(message, type) {
+        hideWorkflowMessage(); // Remove any existing message
+        
+        var alertClass = 'alert-info';
+        var iconClass = 'fas fa-info-circle';
+        
+        if (type === 'success') {
+            alertClass = 'alert-success';
+            iconClass = 'fas fa-check-circle';
+        } else if (type === 'error') {
+            alertClass = 'alert-danger';
+            iconClass = 'fas fa-exclamation-triangle';
+        }
+        
+        var messageHtml = '<div id="workflow-assignment-message" class="alert ' + alertClass + ' mt-2">' +
+                         '<i class="' + iconClass + '"></i> ' + message +
+                         '</div>';
+        
+        // Find the workflow form group and append the message
+        var workflowFormGroup = document.querySelector('select[v-model="selectedWorkflow"]');
+        if (workflowFormGroup && workflowFormGroup.parentNode) {
+            workflowFormGroup.parentNode.insertAdjacentHTML('beforeend', messageHtml);
+        }
+    };
+    
+    window.hideWorkflowMessage = function() {
+        var messageEl = document.getElementById('workflow-assignment-message');
+        if (messageEl) {
+            messageEl.remove();
+        }
+    };
+}
+
+// Alternative approach: Try to extend the Vue model if it exists
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait for Vue to initialize and try to add the method
+        setTimeout(function() {
+            if (window.piranha && window.piranha.pageedit && window.piranha.pageedit.model) {
+                // Add the method to the Vue instance
+                window.piranha.pageedit.model.handleWorkflowChange = function() {
+                    console.log('Vue method called, selectedWorkflow:', this.selectedWorkflow);
+                    window.handleWorkflowChange({ target: { value: this.selectedWorkflow } });
+                };
+                console.log('Added handleWorkflowChange method to Vue model');
+            }
+        }, 2000);
+    });
+}
+</script>
+
 <div id="pageSettings" class="modal modal-panel fade" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -119,6 +257,29 @@
                                 </div>
                             </div>
                             <div class="content-blocker"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Workflow</label>
+                        <select v-model="selectedWorkflow" class="form-control" v-on:focus="loadWorkflowsIfNeeded" v-on:change="handleWorkflowChange">
+                            <option value="">Select Workflow</option>
+                            <option v-for="workflow in workflowDefinitions" :value="workflow.id">
+                                {{ workflow.name }} {{ workflow.isActive ? '' : '(Inactive)' }}
+                            </option>
+                        </select>
+                        <div v-if="selectedWorkflow && getSelectedWorkflowDetails()" class="mt-2">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ getSelectedWorkflowDetails().name }}</h6>
+                                    <p class="card-text" v-if="getSelectedWorkflowDetails().description">{{ getSelectedWorkflowDetails().description }}</p>
+                                    <small class="text-muted">
+                                        ID: {{ getSelectedWorkflowDetails().id }} | 
+                                        Status: <span :class="getSelectedWorkflowDetails().isActive ? 'text-success' : 'text-muted'">
+                                            {{ getSelectedWorkflowDetails().isActive ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    </small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

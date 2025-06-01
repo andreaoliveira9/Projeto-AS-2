@@ -485,20 +485,7 @@
                             if (summaryEl) summaryEl.style.display = 'block';
                         }
 
-                        function toggleAuditDetails(recordId) {
-                            const detailsElement = document.getElementById('audit-details-' + recordId);
-                            const toggleButton = document.getElementById('audit-toggle-' + recordId);
-                            
-                            if (detailsElement && toggleButton) {
-                                if (detailsElement.style.display === 'none' || detailsElement.style.display === '') {
-                                    detailsElement.style.display = 'block';
-                                    toggleButton.innerHTML = '<i class="fas fa-chevron-up"></i> Hide Details';
-                                } else {
-                                    detailsElement.style.display = 'none';
-                                    toggleButton.innerHTML = '<i class="fas fa-chevron-down"></i> Show Details';
-                                }
-                            }
-                        }
+                        // Função toggleAuditDetails removida conforme solicitado
 
                         function renderAuditTimeline(history) {
                             const timeline = document.getElementById('audit-timeline');
@@ -509,11 +496,6 @@
                             history.forEach(function(record) {
                                 const timelineItem = document.createElement('div');
                                 timelineItem.className = 'timeline-item' + (record.success ? '' : ' timeline-item-error');
-                                
-                                const detailsId = 'audit-details-' + record.id;
-                                const toggleId = 'audit-toggle-' + record.id;
-                                
-                                const metadata = record.metadata ? (typeof record.metadata === 'object' ? JSON.stringify(record.metadata, null, 2) : record.metadata) : '';
                                 
                                 timelineItem.innerHTML = [
                                     '<div class="timeline-marker">',
@@ -532,11 +514,15 @@
                                                             '<span class="badge badge-primary">' + (record.toState || 'N/A') + '</span>',
                                                         '</h6>',
                                                         '<small class="text-muted">',
-                                                            '<i class="fas fa-user"></i> ' + (record.username || record.userId),
+                                                            '<i class="fas fa-user"></i> ' + (record.username || 'N/A'),
                                                             '<span class="mx-2">•</span>',
                                                             '<i class="fas fa-clock"></i> ' + formatAuditDate(record.timestamp),
                                                         '</small>',
                                                     '</div>',
+                                                record.transitionDescription ? 
+                                                    '<div class="text-info small mt-1">' +
+                                                        '<i class="fas fa-exchange-alt mr-1"></i> ' + record.transitionDescription +
+                                                    '</div>' : '',
                                                     '<span class="badge ' + (record.success ? 'badge-success' : 'badge-danger') + '">',
                                                         record.success ? 'Success' : 'Failed',
                                                     '</span>',
@@ -555,38 +541,7 @@
                                                             '<strong>Error:</strong> ' + record.errorMessage +
                                                         '</small>' +
                                                     '</div>' : '',
-                                                '<div class="mt-2">',
-                                                    '<button id="' + toggleId + '" class="btn btn-link btn-sm p-0" onclick="toggleAuditDetails(\'' + record.id + '\')" style="color: #007bff; text-decoration: none;">',
-                                                        '<i class="fas fa-chevron-down"></i> Show Details',
-                                                    '</button>',
-                                                    '<div id="' + detailsId + '" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #dee2e6;">',
-                                                        '<div class="row">',
-                                                            '<div class="col-sm-6">',
-                                                                '<small class="text-muted d-block">Content ID:</small>',
-                                                                '<code class="small">' + record.contentId + '</code>',
-                                                            '</div>',
-                                                            '<div class="col-sm-6">',
-                                                                '<small class="text-muted d-block">Content Type:</small>',
-                                                                '<span class="small">' + record.contentType + '</span>',
-                                                            '</div>',
-                                                            record.workflowInstanceId ?
-                                                                '<div class="col-sm-6 mt-2">' +
-                                                                    '<small class="text-muted d-block">Workflow Instance:</small>' +
-                                                                    '<code class="small">' + record.workflowInstanceId + '</code>' +
-                                                                '</div>' : '',
-                                                            record.transitionRuleId ?
-                                                                '<div class="col-sm-6 mt-2">' +
-                                                                    '<small class="text-muted d-block">Transition Rule:</small>' +
-                                                                    '<code class="small">' + record.transitionRuleId + '</code>' +
-                                                                '</div>' : '',
-                                                            metadata ?
-                                                                '<div class="col-12 mt-2">' +
-                                                                    '<small class="text-muted d-block">Metadata:</small>' +
-                                                                    '<pre class="small bg-light p-2 rounded" style="font-size: 0.75rem; max-height: 200px; overflow-y: auto;">' + metadata + '</pre>' +
-                                                                '</div>' : '',
-                                                        '</div>',
-                                                    '</div>',
-                                                '</div>',
+                                                // Botão "Show Details" removido conforme solicitado
                                             '</div>',
                                         '</div>',
                                     '</div>'

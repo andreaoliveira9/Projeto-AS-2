@@ -8,12 +8,15 @@
  *
  */
 
+#nullable enable
+
 using Microsoft.EntityFrameworkCore;
 
-namespace Piranha.Data.EditorialWorkflowAndAudit;
+namespace Piranha.Data.EditorialWorkflowAndAuditAndNotifications;
 
 using Piranha.Data.EditorialWorkflow;
 using Piranha.Data.Audit;
+using Piranha.Data.Notifications;
 
 /// <summary>
 /// Interface for the Editorial Workflow database context.
@@ -54,16 +57,24 @@ public interface IAuditDb
     DbSet<StateChangeRecord> StateChangeRecords { get; set; }
 }
 
-/// <summary>
-/// Extensions for configuring Editorial Workflow tables in an existing DbContext.
-/// </summary>
-public static class EditorialWorkflowAndAuditDbExtensions
+public interface INotificationsDb
 {
     /// <summary>
-    /// Configures the Editorial Workflow entities in the model builder.
+    /// Gets/sets the notifications set.
+    /// </summary>
+    DbSet<Notification> Notifications { get; set; }
+}
+
+/// <summary>
+/// Extensions for configuring Editorial Workflow, Audit and Notifications tables in an existing DbContext.
+/// </summary>
+public static class EditorialWorkflowAndAuditAndNotificationsDbExtensions
+{
+    /// <summary>
+    /// Configures the Editorial Workflow, Audit and Notifications entities in the model builder.
     /// </summary>
     /// <param name="modelBuilder">The model builder</param>
-    public static void ConfigureEditorialWorkflowAndAudit(this ModelBuilder modelBuilder)
+    public static void ConfigureEditorialWorkflowAndAuditAndNotifications(this ModelBuilder modelBuilder)
     {
         // Configure table names with prefix
         modelBuilder.Entity<WorkflowDefinition>().ToTable("Piranha_WorkflowDefinitions");
@@ -179,28 +190,56 @@ public static class EditorialWorkflowAndAuditDbExtensions
         // StateChangeRecord configuration
         var stateChangeRecord = modelBuilder.Entity<StateChangeRecord>();
         stateChangeRecord.HasKey(s => s.Id);
-        stateChangeRecord.Property(s => s.WorkflowInstanceId).IsRequired();
         stateChangeRecord.Property(s => s.ContentId).IsRequired();
-        stateChangeRecord.Property(s => s.ContentType).IsRequired().HasMaxLength(50);
-        stateChangeRecord.Property(s => s.FromState).HasMaxLength(100);
+        stateChangeRecord.Property(s => s.ContentName).IsRequired().HasMaxLength(100);
+        stateChangeRecord.Property(s => s.FromState).IsRequired().HasMaxLength(100);
         stateChangeRecord.Property(s => s.ToState).IsRequired().HasMaxLength(100);
-        stateChangeRecord.Property(s => s.UserId).IsRequired().HasMaxLength(450);
-        stateChangeRecord.Property(s => s.Username).HasMaxLength(256);
+        stateChangeRecord.Property(s => s.transitionDescription).IsRequired().HasMaxLength(500);
+        stateChangeRecord.Property(s => s.reviewedBy).IsRequired().HasMaxLength(256);
+        stateChangeRecord.Property(s => s.approved).IsRequired().HasDefaultValue(true);
         stateChangeRecord.Property(s => s.Timestamp).IsRequired();
         stateChangeRecord.Property(s => s.Comments).HasMaxLength(1000);
-        stateChangeRecord.Property(s => s.TransitionRuleId);
-        stateChangeRecord.Property(s => s.Metadata).HasColumnType("TEXT");
         stateChangeRecord.Property(s => s.Success).IsRequired().HasDefaultValue(true);
         stateChangeRecord.Property(s => s.ErrorMessage).HasMaxLength(2000);
 
         // Indexes for better query performance
-        stateChangeRecord.HasIndex(s => s.WorkflowInstanceId);
         stateChangeRecord.HasIndex(s => s.ContentId);
         stateChangeRecord.HasIndex(s => new { s.ContentId, s.Timestamp });
-        stateChangeRecord.HasIndex(s => s.UserId);
+        stateChangeRecord.HasIndex(s => s.reviewedBy);
+        stateChangeRecord.HasIndex(s => s.approved);
         stateChangeRecord.HasIndex(s => s.Timestamp);
         stateChangeRecord.HasIndex(s => new { s.FromState, s.ToState });
-        stateChangeRecord.HasIndex(s => s.TransitionRuleId);
         stateChangeRecord.HasIndex(s => s.Success);
+
+        // Configure table names with prefix for notifications (TPH - Single table)
+        modelBuilder.Entity<Notification>().ToTable("Piranha_Notifications");
+
+        // Notification configuration (base class)
+        var notification = modelBuilder.Entity<Notification>();
+        notification.HasKey(n => n.Id);
+        notification.Property(n => n.Timestamp).IsRequired();
+        notification.HasIndex(n => n.Timestamp);
+        
+        // Configure TPH inheritance with discriminator
+        notification.HasDiscriminator<string>("NotificationType")
+            .HasValue<Notification>("Base")
+            .HasValue<StateChangedNotification>("StateChanged");
+
+        // StateChangedNotification configuration
+        var stateChangedNotification = modelBuilder.Entity<StateChangedNotification>();
+        stateChangedNotification.Property(n => n.ContentId).IsRequired();
+        stateChangedNotification.Property(n => n.ContentName).IsRequired().HasMaxLength(100);
+        stateChangedNotification.Property(n => n.FromState).IsRequired().HasMaxLength(100);
+        stateChangedNotification.Property(n => n.ToState).IsRequired().HasMaxLength(100);
+        stateChangedNotification.Property(n => n.TransitionDescription).IsRequired().HasMaxLength(500);
+        stateChangedNotification.Property(n => n.ReviewedBy).IsRequired().HasMaxLength(256);
+        stateChangedNotification.Property(n => n.Approved).IsRequired().HasDefaultValue(true);
+        
+        // Indexes for StateChangedNotification
+        stateChangedNotification.HasIndex(n => n.ContentId);
+        stateChangedNotification.HasIndex(n => new { n.ContentId, n.Timestamp });
+        stateChangedNotification.HasIndex(n => n.ReviewedBy);
+        stateChangedNotification.HasIndex(n => n.Approved);
+        stateChangedNotification.HasIndex(n => new { n.FromState, n.ToState });
     }
 }

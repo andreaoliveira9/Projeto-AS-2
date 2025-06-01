@@ -1,0 +1,481 @@
+@page "~/manager/notifications"
+@inject ManagerLocalizer Localizer
+@{
+    ViewBag.Title = "Notifications";
+    ViewBag.MenuItem = "Notifications";
+}
+@section script
+{
+    <script src="~/manager/assets/js/piranha.components.min.js?v=@Piranha.Utils.GetAssemblyVersionHash(typeof(Piranha.Manager.Module).Assembly)"></script>
+    
+    <script type="text/javascript">
+        // Notifications Management
+        var notifications = new Vue({
+            el: '#notifications',
+            data: {
+                loading: true,
+                notifications: [],
+                summary: null,
+                error: null,
+                selectedNotification: null,
+                detailModal: false,
+                filterContentId: '',
+                filteredNotifications: [],
+                filterPageName: ''
+            },
+            computed: {
+                displayNotifications: function() {
+                    if (this.filterPageName) {
+                        return this.filteredNotifications;
+                    }
+                    return this.notifications;
+                }
+            },
+            methods: {
+                // Load all notifications
+                load: function() {
+                    var self = this;
+                    self.loading = true;
+                    self.error = null;
+                    
+                    fetch('/api/notifications', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to load notifications');
+                        }
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        self.notifications = data || [];
+                        console.log('Loaded notifications:', self.notifications);
+                        self.loadSummary();
+                    })
+                    .catch(function(error) {
+                        console.error('Error loading notifications:', error);
+                        self.error = 'Failed to load notifications';
+                        self.loading = false;
+                    });
+                },
+                
+                // Load summary information
+                loadSummary: function() {
+                    var self = this;
+                    
+                    fetch('/api/notifications/summary', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            console.warn('Failed to load notifications summary');
+                            return null;
+                        }
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        self.summary = data;
+                        console.log('Loaded summary:', self.summary);
+                        self.loading = false;
+                    })
+                    .catch(function(error) {
+                        console.error('Error loading summary:', error);
+                        self.loading = false;
+                    });
+                },
+                
+                // Filter notifications by page name
+                filterByPageName: function(pageName) {
+                    var self = this;
+                    
+                    if (!pageName) {
+                        self.filterPageName = '';
+                        self.filteredNotifications = [];
+                        return;
+                    }
+                    
+                    self.filterPageName = pageName;
+                    
+                    // Filter locally by page name
+                    self.filteredNotifications = self.notifications.filter(function(notification) {
+                        return notification.contentName === pageName;
+                    });
+                    
+                    console.log('Filtered notifications by page name:', self.filteredNotifications);
+                },
+                
+                // Clear page name filter
+                clearFilter: function() {
+                    this.filterPageName = '';
+                    this.filteredNotifications = [];
+                },
+                
+                // Show notification details
+                showDetails: function(notification) {
+                    this.selectedNotification = notification;
+                    this.detailModal = true;
+                },
+                
+                // Close detail modal
+                closeDetails: function() {
+                    this.detailModal = false;
+                    this.selectedNotification = null;
+                },
+                
+                // Format date
+                formatDate: function(dateString) {
+                    if (!dateString) return 'N/A';
+                    return new Date(dateString).toLocaleString();
+                },
+                
+                // Format relative time
+                formatRelativeTime: function(dateString) {
+                    if (!dateString) return 'N/A';
+                    
+                    var now = new Date();
+                    var notificationTime = new Date(dateString);
+                    var diffInMs = now - notificationTime;
+                    var diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+                    var diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+                    var diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+                    
+                    if (diffInMinutes < 1) {
+                        return 'Just now';
+                    } else if (diffInMinutes < 60) {
+                        return diffInMinutes + ' minute' + (diffInMinutes > 1 ? 's' : '') + ' ago';
+                    } else if (diffInHours < 24) {
+                        return diffInHours + ' hour' + (diffInHours > 1 ? 's' : '') + ' ago';
+                    } else if (diffInDays < 7) {
+                        return diffInDays + ' day' + (diffInDays > 1 ? 's' : '') + ' ago';
+                    } else {
+                        return this.formatDate(dateString);
+                    }
+                },
+                
+                // Get transition direction icon
+                getTransitionIcon: function(fromState, toState) {
+                    // Check for common state patterns
+                    if (fromState.toLowerCase().includes('draft') && toState.toLowerCase().includes('review')) {
+                        return 'fas fa-eye';
+                    } else if (fromState.toLowerCase().includes('review') && toState.toLowerCase().includes('publish')) {
+                        return 'fas fa-globe';
+                    } else if (fromState.toLowerCase().includes('publish') && toState.toLowerCase().includes('draft')) {
+                        return 'fas fa-undo';
+                    } else if (toState.toLowerCase().includes('publish')) {
+                        return 'fas fa-check-circle';
+                    } else if (toState.toLowerCase().includes('reject')) {
+                        return 'fas fa-times-circle';
+                    } else {
+                        return 'fas fa-arrow-right';
+                    }
+                },
+                
+                // Get transition badge class
+                getTransitionClass: function(fromState, toState) {
+                    if (toState.toLowerCase().includes('publish')) {
+                        return 'badge-success';
+                    } else if (toState.toLowerCase().includes('reject') || toState.toLowerCase().includes('draft')) {
+                        return 'badge-warning';
+                    } else if (toState.toLowerCase().includes('review')) {
+                        return 'badge-info';
+                    } else {
+                        return 'badge-secondary';
+                    }
+                },
+                
+                // Get unique page names for filter dropdown
+                getUniquePageNames: function() {
+                    var pageNames = [...new Set(this.notifications.map(n => n.contentName).filter(name => name && name.trim() !== ''))];
+                    return pageNames.sort();
+                }
+            },
+            mounted: function() {
+                this.load();
+            }
+        });
+    </script>
+}
+
+<div id="notifications">
+    <div class="top">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">@Localizer.Menu["System"]</li>
+                <li class="breadcrumb-item">Editorial Workflows</li>
+                <li class="breadcrumb-item active" aria-current="page">Notifications</li>
+            </ol>
+        </nav>
+
+        <div class="container-fluid">
+            <div class="top-nav">
+                <div class="title">
+                    <h2>Workflow Notifications</h2>
+                    <small class="text-muted">View all state change notifications across the system</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid app" :class="{ ready: !loading }">
+        <!-- Loading spinner -->
+        <div v-if="loading" class="row">
+            <div class="col text-center">
+                <div class="spinner-border" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                <p class="mt-2">Loading notifications...</p>
+            </div>
+        </div>
+
+        <!-- Error message -->
+        <div v-if="error && !loading" class="row">
+            <div class="col">
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    {{ error }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div v-if="!loading && !error && summary" class="row mb-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0 text-primary">{{ summary.totalNotifications }}</h4>
+                                <small class="text-muted">Total Notifications</small>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-bell fa-2x text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0 text-info">{{ summary.uniqueContentCount }}</h4>
+                                <small class="text-muted">Unique Content Items</small>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-file-alt fa-2x text-info"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-1 text-success">Latest Activity</h6>
+                                <small class="text-muted">{{ formatRelativeTime(summary.lastNotification) }}</small>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-clock fa-2x text-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div v-if="!loading && !error" class="row mb-3">
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="form-group mb-0">
+                                    <label for="pageFilter" class="form-label">Filter by Page Name:</label>
+                                    <select id="pageFilter" class="form-control" v-model="filterPageName" v-on:change="filterByPageName(filterPageName)">
+                                        <option value="">-- All Pages --</option>
+                                        <option v-for="pageName in getUniquePageNames()" :key="pageName" :value="pageName">
+                                            {{ pageName }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <button v-if="filterPageName" class="btn btn-outline-secondary" v-on:click="clearFilter()">
+                                    <i class="fas fa-times"></i> Clear Filter
+                                </button>
+                                <button class="btn btn-outline-primary ml-2" v-on:click="load()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications table -->
+        <div v-if="!loading && !error" class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-bell"></i>
+                            <span v-if="filterPageName">Filtered Notifications</span>
+                            <span v-else>All Notifications</span>
+                            <span class="badge badge-secondary ml-2">{{ displayNotifications.length }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0" v-if="displayNotifications.length > 0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Content</th>
+                                        <th>State Transition</th>
+                                        <th>Approved By</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="notification in displayNotifications" :key="notification.id">
+                                        <td>
+                                            <div>
+                                                <strong>{{ formatRelativeTime(notification.timestamp) }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ formatDate(notification.timestamp) }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <strong>{{ notification.contentName || 'Untitled' }}</strong>
+                                                <br>
+                                                <small class="text-muted">ID: {{ notification.contentId }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge badge-secondary px-2 py-1 mr-1">{{ notification.fromState || 'N/A' }}</span>
+                                                <i :class="getTransitionIcon(notification.fromState, notification.toState)" class="text-muted mx-1"></i>
+                                                <span class="badge px-2 py-1" :class="getTransitionClass(notification.fromState, notification.toState)">{{ notification.toState || 'N/A' }}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="font-weight-medium">{{ notification.approvedBy || 'System' }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-truncate" style="max-width: 200px; display: inline-block;" :title="notification.transitionDescription">
+                                                {{ notification.transitionDescription || 'No description' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    v-on:click="showDetails(notification)"
+                                                    title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div v-else class="card-body text-center text-muted">
+                        <i class="fas fa-bell-slash fa-3x mb-3"></i>
+                        <p v-if="filterPageName">No notifications found for the selected page</p>
+                        <p v-else>No notifications found</p>
+                        <small v-if="filterPageName">Try clearing the filter or selecting a different page</small>
+                        <small v-else>Notifications will appear here when workflow state changes occur</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal fade" :class="{ show: detailModal }" :style="{ display: detailModal ? 'block' : 'none' }" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-bell"></i>
+                        Notification Details
+                    </h5>
+                    <button type="button" class="close" v-on:click="closeDetails">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" v-if="selectedNotification">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>General Information</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Notification ID:</strong></td>
+                                    <td>{{ selectedNotification.id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Timestamp:</strong></td>
+                                    <td>{{ formatDate(selectedNotification.timestamp) }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Content ID:</strong></td>
+                                    <td>{{ selectedNotification.contentId }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Content Name:</strong></td>
+                                    <td>{{ selectedNotification.contentName || 'Untitled' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Approved By:</strong></td>
+                                    <td>{{ selectedNotification.approvedBy || 'System' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>State Transition</h6>
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <span class="badge badge-secondary badge-lg px-3 py-2">{{ selectedNotification.fromState || 'N/A' }}</span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <i :class="getTransitionIcon(selectedNotification.fromState, selectedNotification.toState)" class="fa-2x text-muted"></i>
+                                    </div>
+                                    <div>
+                                        <span class="badge badge-lg px-3 py-2" :class="getTransitionClass(selectedNotification.fromState, selectedNotification.toState)">{{ selectedNotification.toState || 'N/A' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col">
+                            <h6>Transition Description</h6>
+                            <div class="alert alert-info">
+                                {{ selectedNotification.transitionDescription || 'No description provided' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" v-on:click="closeDetails">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal backdrop -->
+    <div v-if="detailModal" class="modal-backdrop fade show"></div>
+</div>

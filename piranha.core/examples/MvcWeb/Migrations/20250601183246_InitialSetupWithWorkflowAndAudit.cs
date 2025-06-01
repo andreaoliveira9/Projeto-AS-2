@@ -91,6 +91,25 @@ namespace MvcWeb.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Piranha_Notifications",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    NotificationType = table.Column<string>(type: "TEXT", maxLength: 13, nullable: false),
+                    ContentId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    ContentName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    FromState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    ToState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    TransitionDescription = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    ApprovedBy = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Piranha_Notifications", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Piranha_PageTypes",
                 columns: table => new
                 {
@@ -156,17 +175,14 @@ namespace MvcWeb.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    WorkflowInstanceId = table.Column<Guid>(type: "TEXT", nullable: false),
                     ContentId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    ContentType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
-                    FromState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    ContentName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    FromState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     ToState = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    UserId = table.Column<string>(type: "TEXT", maxLength: 450, nullable: false),
-                    Username = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    transitionDescription = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
+                    approvedBy = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
                     Timestamp = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Comments = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    TransitionRuleId = table.Column<Guid>(type: "TEXT", nullable: true),
-                    Metadata = table.Column<string>(type: "TEXT", nullable: true),
                     Success = table.Column<bool>(type: "INTEGER", nullable: false, defaultValue: true),
                     ErrorMessage = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true)
                 },
@@ -1148,6 +1164,31 @@ namespace MvcWeb.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Piranha_Notifications_ApprovedBy",
+                table: "Piranha_Notifications",
+                column: "ApprovedBy");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_Notifications_ContentId",
+                table: "Piranha_Notifications",
+                column: "ContentId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_Notifications_ContentId_Timestamp",
+                table: "Piranha_Notifications",
+                columns: new[] { "ContentId", "Timestamp" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_Notifications_FromState_ToState",
+                table: "Piranha_Notifications",
+                columns: new[] { "FromState", "ToState" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Piranha_Notifications_Timestamp",
+                table: "Piranha_Notifications",
+                column: "Timestamp");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Piranha_PageBlocks_BlockId",
                 table: "Piranha_PageBlocks",
                 column: "BlockId");
@@ -1259,6 +1300,11 @@ namespace MvcWeb.Migrations
                 column: "LanguageId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Piranha_StateChangeRecords_approvedBy",
+                table: "Piranha_StateChangeRecords",
+                column: "approvedBy");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Piranha_StateChangeRecords_ContentId",
                 table: "Piranha_StateChangeRecords",
                 column: "ContentId");
@@ -1282,21 +1328,6 @@ namespace MvcWeb.Migrations
                 name: "IX_Piranha_StateChangeRecords_Timestamp",
                 table: "Piranha_StateChangeRecords",
                 column: "Timestamp");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Piranha_StateChangeRecords_TransitionRuleId",
-                table: "Piranha_StateChangeRecords",
-                column: "TransitionRuleId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Piranha_StateChangeRecords_UserId",
-                table: "Piranha_StateChangeRecords",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Piranha_StateChangeRecords_WorkflowInstanceId",
-                table: "Piranha_StateChangeRecords",
-                column: "WorkflowInstanceId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Piranha_Tags_BlogId_Slug",
@@ -1441,6 +1472,9 @@ namespace MvcWeb.Migrations
 
             migrationBuilder.DropTable(
                 name: "Piranha_MediaVersions");
+
+            migrationBuilder.DropTable(
+                name: "Piranha_Notifications");
 
             migrationBuilder.DropTable(
                 name: "Piranha_PageBlocks");

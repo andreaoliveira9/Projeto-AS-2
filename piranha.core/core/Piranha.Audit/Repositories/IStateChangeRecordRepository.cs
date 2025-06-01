@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 using Piranha.Audit.Models;
 
 namespace Piranha.Audit.Repositories;

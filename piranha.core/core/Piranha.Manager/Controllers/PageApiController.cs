@@ -22,9 +22,9 @@ namespace Piranha.Manager.Controllers;
 /// </summary>
 [Area("Manager")]
 [Route("manager/api/page")]
-[Authorize(Policy = Permission.Admin)]
+//[Authorize(Policy = Permission.Admin)]
 [ApiController]
-[AutoValidateAntiforgeryToken]
+//[AutoValidateAntiforgeryToken]
 public class PageApiController : Controller
 {
     private readonly PageService _service;
@@ -51,7 +51,7 @@ public class PageApiController : Controller
     /// <returns>The list model</returns>
     [Route("list")]
     [HttpGet]
-    [Authorize(Policy = Permission.Pages)]
+    //[Authorize(Policy = Permission.Pages)]
     public async Task<PageListModel> List()
     {
         var model = await _service.GetList();
