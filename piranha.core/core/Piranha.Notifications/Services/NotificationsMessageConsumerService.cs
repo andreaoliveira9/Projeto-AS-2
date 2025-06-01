@@ -205,7 +205,7 @@ public sealed class NotificationsMessageConsumerService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing audit message: {Message}", 
+            _logger.LogError(ex, "Error processing notification message: {Message}", 
                 message?.Length > 200 ? message[..200] + "..." : message);
             throw;
         }
