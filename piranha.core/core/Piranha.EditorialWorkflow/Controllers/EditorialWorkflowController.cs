@@ -117,6 +117,102 @@ public class EditorialWorkflowController : ControllerBase
         return Ok(instances);
     }
 
+    [HttpDelete("content-extensions/{contentId}")]
+    public async Task<ActionResult> DeleteWorkflowContentExtension(string contentId)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(contentId))
+                return BadRequest("ContentId is required");
+
+            // Check if the workflow content extension exists
+            var extension = await _workflowService.GetWorkflowContentExtensionAsync(contentId);
+            if (extension == null)
+                return NotFound("Workflow content extension not found");
+
+            // If there's an active workflow instance, inform the caller
+            WorkflowInstance associatedInstance = null;
+            if (extension.CurrentWorkflowInstanceId.HasValue)
+            {
+                associatedInstance = await _workflowService.GetWorkflowInstanceByIdAsync(extension.CurrentWorkflowInstanceId.Value);
+            }
+
+            // Delete the workflow content extension
+            await _workflowService.DeleteWorkflowContentExtensionAsync(contentId);
+
+            return Ok(new
+            {
+                success = true,
+                message = "Workflow content extension deleted successfully",
+                contentId = contentId,
+                hadAssociatedInstance = associatedInstance != null,
+                associatedInstanceId = associatedInstance?.Id,
+                warning = associatedInstance != null ? "Note: Associated WorkflowInstance still exists and may need to be deleted separately" : null
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting workflow content extension for ContentId {ContentId}", contentId);
+            return StatusCode(500, "An error occurred while deleting the workflow content extension");
+        }
+    }
+
+    /// <summary>
+    /// Deletes all workflow entries (WorkflowInstance and WorkflowContentExtension) for a given content ID
+    /// </summary>
+    [HttpDelete("content/{contentId}/cleanup")]
+    public async Task<ActionResult> CleanupWorkflowEntriesForContent(string contentId)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(contentId))
+                return BadRequest("ContentId is required");
+
+            // Check if there are workflow entries for this content
+            var existingContentExtension = await _workflowService.GetWorkflowContentExtensionAsync(contentId);
+            if (existingContentExtension == null)
+            {
+                return NotFound("No workflow entries found for the specified content");
+            }
+
+            var deletedInstanceId = (Guid?)null;
+            var deletedExtensionId = existingContentExtension.Id;
+
+            // If there's an active workflow instance, delete it first
+            if (existingContentExtension.CurrentWorkflowInstanceId.HasValue)
+            {
+                var existingInstance = await _workflowService.GetWorkflowInstanceByIdAsync(existingContentExtension.CurrentWorkflowInstanceId.Value);
+                if (existingInstance != null)
+                {
+                    deletedInstanceId = existingInstance.Id;
+                    await _workflowService.DeleteWorkflowInstanceAsync(existingInstance.Id);
+                    _logger.LogInformation("Deleted WorkflowInstance {InstanceId} for content {ContentId}", existingInstance.Id, contentId);
+                }
+            }
+
+            // Delete the WorkflowContentExtension
+            await _workflowService.DeleteWorkflowContentExtensionAsync(contentId);
+            _logger.LogInformation("Deleted WorkflowContentExtension {ExtensionId} for content {ContentId}", deletedExtensionId, contentId);
+
+            return Ok(new
+            {
+                success = true,
+                message = "All workflow entries cleaned up successfully",
+                contentId = contentId,
+                deletedWorkflowInstanceId = deletedInstanceId,
+                deletedWorkflowContentExtensionId = deletedExtensionId,
+                summary = deletedInstanceId.HasValue 
+                    ? "Deleted both WorkflowInstance and WorkflowContentExtension" 
+                    : "Deleted WorkflowContentExtension only (no active instance found)"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cleaning up workflow entries for ContentId {ContentId}", contentId);
+            return StatusCode(500, "An error occurred while cleaning up workflow entries");
+        }
+    }
+
     /// <summary>
     /// Gets all workflow instances regardless of user (admin access)
     /// </summary>
@@ -399,6 +495,36 @@ public class EditorialWorkflowController : ControllerBase
     {
         var result = await _workflowService.CreateWorkflowInstanceAsync(instance);
         return CreatedAtAction(nameof(GetWorkflowInstance), new { id = result.Id }, result);
+    }
+
+    [HttpDelete("instances/{id}")]
+    public async Task<ActionResult> DeleteWorkflowInstance(Guid id)
+    {
+        try
+        {
+            if (id == Guid.Empty)
+                return BadRequest("WorkflowInstance ID is required");
+
+            // Check if the workflow instance exists
+            var instance = await _workflowService.GetWorkflowInstanceByIdAsync(id);
+            if (instance == null)
+                return NotFound("Workflow instance not found");
+
+            // Delete the workflow instance
+            await _workflowService.DeleteWorkflowInstanceAsync(id);
+
+            return Ok(new
+            {
+                success = true,
+                message = "Workflow instance deleted successfully",
+                workflowInstanceId = id
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting workflow instance {WorkflowInstanceId}", id);
+            return StatusCode(500, "An error occurred while deleting the workflow instance");
+        }
     }
 
     [HttpPut("instances/{id}")]

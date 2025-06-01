@@ -303,6 +303,50 @@
                     this.transitionComment = '';
                 },
                 
+                // Delete workflow instance
+                deleteInstance: function(instance) {
+                    var self = this;
+                    
+                    // Confirm deletion
+                    if (!confirm('Are you sure you want to delete this workflow instance?\n\nContent: ' + (instance.contentTitle || 'Untitled') + '\nWorkflow: ' + self.getWorkflowDefinitionName(instance.workflowDefinitionId) + '\n\nThis action cannot be undone.')) {
+                        return;
+                    }
+                    
+                    fetch('/api/workflow/instances/' + instance.id, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to delete workflow instance');
+                        }
+                        return response.json();
+                    })
+                    .then(function(result) {
+                        // Remove the instance from the list
+                        var index = self.instances.findIndex(function(i) { return i.id === instance.id; });
+                        if (index !== -1) {
+                            self.instances.splice(index, 1);
+                        }
+                        
+                        piranha.notifications.push({
+                            body: "Workflow instance deleted successfully",
+                            type: "success",
+                            hide: true
+                        });
+                    })
+                    .catch(function(error) {
+                        console.error('Error deleting workflow instance:', error);
+                        piranha.notifications.push({
+                            body: "Failed to delete workflow instance: " + error.message,
+                            type: "danger",
+                            hide: true
+                        });
+                    });
+                },
+                
                 // Format date
                 formatDate: function(dateString) {
                     if (!dateString) return 'N/A';
@@ -464,6 +508,11 @@
                                                         v-on:click="openTransitionModal(instance)"
                                                         title="Transition to Next State">
                                                     <i class="fas fa-arrow-right"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" 
+                                                        v-on:click="deleteInstance(instance)"
+                                                        title="Delete Instance">
+                                                    <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
                                         </td>

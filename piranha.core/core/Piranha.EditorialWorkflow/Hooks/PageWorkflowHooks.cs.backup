@@ -1,0 +1,98 @@
+/*
+ * Copyright (c) .NET Foundation and Contributors
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license. See the LICENSE file for details.
+ *
+ * https://github.com/piranhacms/piranha.core
+ *
+ */
+
+using Microsoft.Extensions.Logging;
+using Piranha.EditorialWorkflow.Services;
+using Piranha.Models;
+
+namespace Piranha.EditorialWorkflow.Hooks;
+
+/// <summary>
+/// Hooks for handling page workflow operations.
+/// </summary>
+public class PageWorkflowHooks
+{
+    private readonly IEditorialWorkflowService _workflowService;
+    private readonly ILogger<PageWorkflowHooks> _logger;
+
+    /// <summary>
+    /// Default constructor.
+    /// </summary>
+    /// <param name="workflowService">The workflow service</param>
+    /// <param name="logger">The logger</param>
+    public PageWorkflowHooks(IEditorialWorkflowService workflowService, ILogger<PageWorkflowHooks> logger)
+    {
+        _workflowService = workflowService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Registers the workflow hooks.
+    /// </summary>
+    public void RegisterHooks()
+    {
+        // Register hook to clean up workflow entries when a page is deleted
+        App.Hooks.RegisterOnBeforeDelete<PageBase>(OnBeforePageDelete);
+        
+        _logger.LogInformation("PageWorkflowHooks: Registered page workflow hooks");
+    }
+
+    /// <summary>
+    /// Called before a page is deleted. Removes associated workflow entries.
+    /// </summary>
+    /// <param name="model">The page being deleted</param>
+    private async void OnBeforePageDelete(PageBase model)
+    {
+        if (model == null)
+        {
+            _logger.LogWarning("PageWorkflowHooks.OnBeforePageDelete: Page model is null");
+            return;
+        }
+
+        try
+        {
+            string contentId = model.Id.ToString();
+            _logger.LogInformation("PageWorkflowHooks.OnBeforePageDelete: Cleaning up workflow entries for page {PageId}", model.Id);
+
+            // Check if there are workflow entries for this page
+            var existingContentExtension = await _workflowService.GetWorkflowContentExtensionAsync(contentId);
+            if (existingContentExtension != null)
+            {
+                _logger.LogInformation("PageWorkflowHooks.OnBeforePageDelete: Found WorkflowContentExtension for page {PageId}, deleting it", model.Id);
+                
+                // If there's an active workflow instance, delete it first
+                if (existingContentExtension.CurrentWorkflowInstanceId.HasValue)
+                {
+                    var existingInstance = await _workflowService.GetWorkflowInstanceByIdAsync(existingContentExtension.CurrentWorkflowInstanceId.Value);
+                    if (existingInstance != null)
+                    {
+                        _logger.LogInformation("PageWorkflowHooks.OnBeforePageDelete: Found WorkflowInstance {InstanceId} for page {PageId}, deleting it", existingInstance.Id, model.Id);
+                        await _workflowService.DeleteWorkflowInstanceAsync(existingInstance.Id);
+                    }
+                }
+                
+                // Delete the WorkflowContentExtension
+                await _workflowService.DeleteWorkflowContentExtensionAsync(contentId);
+                
+                _logger.LogInformation("PageWorkflowHooks.OnBeforePageDelete: Successfully cleaned up workflow entries for page {PageId}", model.Id);
+            }
+            else
+            {
+                _logger.LogDebug("PageWorkflowHooks.OnBeforePageDelete: No workflow entries found for page {PageId}", model.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PageWorkflowHooks.OnBeforePageDelete: Error cleaning up workflow entries for page {PageId}", model?.Id);
+            // Don't rethrow the exception to avoid blocking the page deletion
+            // The page deletion should proceed even if workflow cleanup fails
+        }
+    }
+}
