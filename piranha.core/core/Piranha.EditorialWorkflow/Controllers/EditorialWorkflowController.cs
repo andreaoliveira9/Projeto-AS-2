@@ -497,6 +497,80 @@ public class EditorialWorkflowController : ControllerBase
         return CreatedAtAction(nameof(GetWorkflowInstance), new { id = result.Id }, result);
     }
 
+    /// <summary>
+    /// Rejects a workflow instance by resetting it to the initial state
+    /// </summary>
+    [HttpPost("instances/{instanceId}/reject")]
+    public async Task<ActionResult> RejectWorkflowInstance(Guid instanceId)
+    {
+        try
+        {
+            if (instanceId == Guid.Empty)
+                return BadRequest("WorkflowInstance ID is required");
+
+            // Get the workflow instance
+            var workflowInstance = await _workflowService.GetWorkflowInstanceByIdAsync(instanceId);
+            if (workflowInstance == null)
+                return NotFound("Workflow instance not found");
+
+            // Get the workflow definition to find the initial state
+            var workflowDefinition = await _workflowService.GetWorkflowDefinitionByIdAsync(workflowInstance.WorkflowDefinitionId);
+            if (workflowDefinition == null)
+                return BadRequest("Workflow definition not found");
+
+            // Get all states for this workflow definition
+            var workflowStates = await _workflowService.GetWorkflowStatesByDefinitionAsync(workflowInstance.WorkflowDefinitionId);
+            var initialState = workflowStates.FirstOrDefault(s => s.IsInitial);
+            
+            if (initialState == null)
+                return BadRequest("No initial state found for this workflow");
+
+            // Reset the workflow instance to the initial state
+            workflowInstance.CurrentStateId = initialState.Id;
+            workflowInstance.LastModified = DateTime.UtcNow;
+            
+            // Add rejection metadata
+            var rejectionLog = new
+            {
+                timestamp = DateTime.UtcNow,
+                action = "rejected",
+                previousStateId = workflowInstance.CurrentStateId,
+                resetToStateId = initialState.Id,
+                performedBy = "current_user" // You might want to get this from the authentication context
+            };
+
+            // Update metadata with rejection log
+            var metadata = string.IsNullOrWhiteSpace(workflowInstance.Metadata) ? "{}" : workflowInstance.Metadata;
+            workflowInstance.Metadata = metadata.TrimEnd('}') + 
+                (metadata == "{}" ? "" : ",") + 
+                $"\"lastRejection\":{System.Text.Json.JsonSerializer.Serialize(rejectionLog)}}}";
+
+            // Update the workflow instance
+            var updatedInstance = await _workflowService.UpdateWorkflowInstanceAsync(workflowInstance);
+
+            _logger.LogInformation("Workflow instance {InstanceId} rejected and reset to initial state {StateId}", 
+                instanceId, initialState.Id);
+
+            return Ok(new
+            {
+                success = true,
+                message = "Workflow instance rejected and reset to initial state",
+                workflowInstanceId = instanceId,
+                resetToState = new
+                {
+                    id = initialState.Id,
+                    name = initialState.Name
+                },
+                updatedInstance = updatedInstance
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error rejecting workflow instance {InstanceId}", instanceId);
+            return StatusCode(500, "An error occurred while rejecting the workflow instance");
+        }
+    }
+
     [HttpDelete("instances/{id}")]
     public async Task<ActionResult> DeleteWorkflowInstance(Guid id)
     {

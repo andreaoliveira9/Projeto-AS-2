@@ -18,6 +18,7 @@
                 contentExtensions: {},
                 workflowDefinitions: {},
                 workflowStates: {},
+                users: {}, // Store user information
                 editingInstance: null,
                 editModal: false,
                 transitionModal: false,
@@ -62,6 +63,37 @@
                         self.error = 'Failed to load workflow instances';
                         self.loading = false;
                     });
+                },
+                
+                // Load user information for display names
+                loadUsers: function() {
+                    var self = this;
+                    
+                    // Get unique user IDs from instances
+                    var userIds = [...new Set(self.instances.map(i => i.createdBy).filter(id => id && id !== 'system'))];
+                    
+                    if (userIds.length === 0) {
+                        self.loading = false;
+                        return;
+                    }
+                    
+                    // For now, we'll create a simple mapping since we don't have a user API endpoint
+                    // In a real implementation, you would call a user API here
+                    userIds.forEach(function(userId) {
+                        // Check if it's a GUID (user ID) or already a display name
+                        var isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+                        
+                        if (isGuid) {
+                            // For GUIDs, we'll show a friendly format until we have a real user API
+                            self.$set(self.users, userId, 'User ' + userId.substring(0, 8));
+                        } else {
+                            // If it's already a name or email, use it directly
+                            self.$set(self.users, userId, userId);
+                        }
+                    });
+                    
+                    console.log('Loaded users:', self.users);
+                    self.loading = false;
                 },
                 
                 // Load workflow definitions for display names
@@ -117,7 +149,7 @@
                     Promise.all(statePromises)
                         .then(function() {
                             console.log('Loaded workflow states:', self.workflowStates);
-                            self.loading = false;
+                            self.loadUsers();
                         })
                         .catch(function(error) {
                             console.error('Error loading workflow states:', error);
@@ -303,6 +335,58 @@
                     this.transitionComment = '';
                 },
                 
+                // Reject workflow instance (reset to initial state)
+                rejectInstance: function() {
+                    var self = this;
+                    
+                    if (!self.transitioningInstance) return;
+                    
+                    // Confirm rejection
+                    if (!confirm('Are you sure you want to reject this workflow instance?\n\nThis will reset it back to the initial state.\n\nContent: ' + (self.transitioningInstance.contentTitle || 'Untitled') + '\nWorkflow: ' + self.getWorkflowDefinitionName(self.transitioningInstance.workflowDefinitionId))) {
+                        return;
+                    }
+                    
+                    fetch('/api/workflow/instances/' + self.transitioningInstance.id + '/reject', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to reject workflow instance');
+                        }
+                        return response.json();
+                    })
+                    .then(function(result) {
+                        // Update the instance in the list with the reset state
+                        var index = self.instances.findIndex(function(i) { return i.id === self.transitioningInstance.id; });
+                        if (index !== -1) {
+                            self.instances[index].currentStateId = result.resetToState.id;
+                            self.instances[index].lastModified = new Date().toISOString();
+                        }
+                        
+                        self.transitionModal = false;
+                        self.transitioningInstance = null;
+                        self.selectedTransition = null;
+                        self.transitionComment = '';
+                        
+                        piranha.notifications.push({
+                            body: "Workflow instance rejected and reset to initial state",
+                            type: "warning",
+                            hide: true
+                        });
+                    })
+                    .catch(function(error) {
+                        console.error('Error rejecting workflow instance:', error);
+                        piranha.notifications.push({
+                            body: "Failed to reject workflow instance: " + error.message,
+                            type: "danger",
+                            hide: true
+                        });
+                    });
+                },
+                
                 // Delete workflow instance
                 deleteInstance: function(instance) {
                     var self = this;
@@ -380,6 +464,42 @@
                 getCurrentStateName: function(currentStateId) {
                     var state = this.workflowStates[currentStateId];
                     return state ? state.name : 'Unknown State';
+                },
+                
+                // Get current state with styling info
+                getCurrentStateInfo: function(currentStateId) {
+                    var state = this.workflowStates[currentStateId];
+                    if (!state) {
+                        return { name: 'Unknown State', class: 'badge-secondary' };
+                    }
+                    
+                    // Determine badge class based on state properties
+                    var badgeClass = 'badge-primary'; // Default
+                    
+                    if (state.isInitial) {
+                        badgeClass = 'badge-info';
+                    } else if (state.isPublished) {
+                        badgeClass = 'badge-success';
+                    } else if (state.isFinal) {
+                        badgeClass = 'badge-dark';
+                    } else {
+                        badgeClass = 'badge-warning';
+                    }
+                    
+                    return {
+                        name: state.name,
+                        class: badgeClass,
+                        isInitial: state.isInitial,
+                        isPublished: state.isPublished,
+                        isFinal: state.isFinal
+                    };
+                },
+                
+                // Get user display name
+                getUserDisplayName: function(userId) {
+                    if (!userId) return 'System';
+                    if (userId.toLowerCase() === 'system') return 'System';
+                    return this.users[userId] || userId;
                 },
                 
                 // Get transition display name
@@ -479,8 +599,11 @@
                                         </td>
                                         <td>{{ getWorkflowDefinitionName(instance.workflowDefinitionId) }}</td>
                                         <td>
-                                            <span class="badge badge-outline-primary">
-                                                {{ getCurrentStateName(instance.currentStateId) }}
+                                            <span class="badge" :class="getCurrentStateInfo(instance.currentStateId).class">
+                                                {{ getCurrentStateInfo(instance.currentStateId).name }}
+                                                <i v-if="getCurrentStateInfo(instance.currentStateId).isInitial" class="fas fa-play ml-1" title="Initial State"></i>
+                                                <i v-if="getCurrentStateInfo(instance.currentStateId).isPublished" class="fas fa-globe ml-1" title="Published State"></i>
+                                                <i v-if="getCurrentStateInfo(instance.currentStateId).isFinal" class="fas fa-flag-checkered ml-1" title="Final State"></i>
                                             </span>
                                         </td>
                                         <td>
@@ -489,7 +612,7 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <small>{{ instance.createdBy || 'System' }}</small>
+                                            <span class="font-weight-medium">{{ getUserDisplayName(instance.createdBy) }}</span>
                                         </td>
                                         <td>
                                             <small>{{ formatDate(instance.created) }}</small>
@@ -650,6 +773,11 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" v-on:click="cancelTransition">Cancel</button>
+                    <button type="button" class="btn btn-warning" v-on:click="rejectInstance"
+                            title="Reset workflow to initial state">
+                        <i class="fas fa-undo"></i>
+                        Reject
+                    </button>
                     <button type="button" class="btn btn-success" v-on:click="performTransition" 
                             :disabled="!selectedTransition || availableTransitions.length === 0">
                         <i class="fas fa-arrow-right"></i>
