@@ -222,13 +222,111 @@ public class EditorialWorkflowController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all workflow instances regardless of user (admin access)
+    /// Gets all workflow instances regardless of user (admin access) with user information
     /// </summary>
     [HttpGet("workflow-instances")]
-    public async Task<ActionResult<IEnumerable<WorkflowInstance>>> GetAllWorkflowInstances()
+    public async Task<ActionResult<IEnumerable<object>>> GetAllWorkflowInstances()
     {
         var instances = await _workflowService.GetAllWorkflowInstancesAsync();
-        return Ok(instances);
+        
+        // Get all unique user IDs from the instances
+        var userIds = instances
+            .Where(i => !string.IsNullOrEmpty(i.CreatedBy) && i.CreatedBy.ToLower() != "system")
+            .Select(i => i.CreatedBy)
+            .Distinct()
+            .ToList();
+        
+        // Fetch user information for all user IDs
+        var userDict = new Dictionary<string, object>();
+        
+        foreach (var userId in userIds)
+        {
+            try
+            {
+                // Try to get user by ID first
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user != null)
+                {
+                    userDict[userId] = new
+                    {
+                        Id = user.Id,
+                        UserName = user.UserName,
+                        Email = user.Email,
+                        DisplayName = !string.IsNullOrEmpty(user.UserName) ? user.UserName : user.Email
+                    };
+                }
+                else
+                {
+                    // Try to get user by username/email if not found by ID
+                    user = await _userManager.FindByNameAsync(userId) ?? await _userManager.FindByEmailAsync(userId);
+                    if (user != null)
+                    {
+                        userDict[userId] = new
+                        {
+                            Id = user.Id,
+                            UserName = user.UserName,
+                            Email = user.Email,
+                            DisplayName = !string.IsNullOrEmpty(user.UserName) ? user.UserName : user.Email
+                        };
+                    }
+                    else
+                    {
+                        // User not found, create a fallback entry
+                        userDict[userId] = new
+                        {
+                            Id = userId,
+                            UserName = userId,
+                            Email = userId,
+                            DisplayName = userId
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load user information for user ID: {UserId}", userId);
+                // Create a fallback entry for failed lookups
+                userDict[userId] = new
+                {
+                    Id = userId,
+                    UserName = userId,
+                    Email = userId,
+                    DisplayName = userId
+                };
+            }
+        }
+        
+        // Create the response with enhanced instance data
+        var enhancedInstances = instances.Select(instance => new
+        {
+            // All original instance properties
+            Id = instance.Id,
+            ContentId = instance.ContentId,
+            ContentType = instance.ContentType,
+            ContentTitle = instance.ContentTitle,
+            WorkflowDefinitionId = instance.WorkflowDefinitionId,
+            CurrentStateId = instance.CurrentStateId,
+            Status = instance.Status,
+            Metadata = instance.Metadata,
+            Created = instance.Created,
+            LastModified = instance.LastModified,
+            CreatedBy = instance.CreatedBy,
+            
+            // Enhanced user information
+            CreatedByUser = userDict.ContainsKey(instance.CreatedBy ?? "") 
+                ? userDict[instance.CreatedBy] 
+                : new 
+                {
+                    Id = instance.CreatedBy ?? "system",
+                    UserName = instance.CreatedBy ?? "System",
+                    Email = instance.CreatedBy ?? "system",
+                    DisplayName = string.IsNullOrEmpty(instance.CreatedBy) || instance.CreatedBy.ToLower() == "system" 
+                        ? "System" 
+                        : instance.CreatedBy
+                }
+        });
+        
+        return Ok(enhancedInstances);
     }
 
     [HttpGet("instances/{id}")]
