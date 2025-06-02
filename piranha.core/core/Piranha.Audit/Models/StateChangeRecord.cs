@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 namespace Piranha.Audit.Models;
 
 /// <summary>
@@ -22,39 +24,39 @@ public sealed class StateChangeRecord
     public Guid Id { get; set; }
 
     /// <summary>
-    /// Gets/sets the workflow instance id.
-    /// </summary>
-    public Guid WorkflowInstanceId { get; set; }
-
-    /// <summary>
-    /// Gets/sets the content id that underwent the state change.
+    /// Gets/sets the content id.
     /// </summary>
     public Guid ContentId { get; set; }
 
     /// <summary>
-    /// Gets/sets the content type (Page, Post, etc.).
+    /// Gets/sets the content type (e.g., "Page", "Post").
     /// </summary>
-    public string ContentType { get; set; }
+    public string ContentName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the previous state of the content.
+    /// Gets/sets the previous state.
     /// </summary>
-    public string FromState { get; set; }
+    public string FromState { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the new state of the content.
+    /// Gets/sets the new state.
     /// </summary>
-    public string ToState { get; set; }
+    public string ToState { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the user who triggered the state change.
+    /// Gets/sets the transition rule id that triggered this change.
     /// </summary>
-    public string UserId { get; set; }
+    public string transitionDescription { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets/sets the username for quick reference.
+    /// Gets/sets the username who reviewed/performed the action.
     /// </summary>
-    public string Username { get; set; }
+    public string reviewedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets whether the transition was approved (true) or rejected (false).
+    /// </summary>
+    public bool approved { get; set; }
 
     /// <summary>
     /// Gets/sets when the state change occurred.
@@ -62,27 +64,17 @@ public sealed class StateChangeRecord
     public DateTime Timestamp { get; set; }
 
     /// <summary>
-    /// Gets/sets optional comments or reasoning for the state change.
+    /// Gets/sets optional comments.
     /// </summary>
-    public string Comments { get; set; }
+    public string? Comments { get; set; }
 
     /// <summary>
-    /// Gets/sets the transition rule that was applied.
-    /// </summary>
-    public Guid? TransitionRuleId { get; set; }
-
-    /// <summary>
-    /// Gets/sets additional metadata about the transition in JSON format.
-    /// </summary>
-    public string Metadata { get; set; }
-
-     /// <summary>
     /// Gets/sets whether the action was successful.
     /// </summary>
-    public bool Success { get; set; } = true;
+    public bool Success { get; set; }
 
     /// <summary>
     /// Gets/sets the error message if the action failed.
     /// </summary>
-    public string ErrorMessage { get; set; }
+    public string? ErrorMessage { get; set; }
 }

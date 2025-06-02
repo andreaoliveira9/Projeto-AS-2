@@ -31,12 +31,22 @@ public interface IEditorialWorkflowService
     // Workflow Instances
     Task<WorkflowInstance> CreateWorkflowInstanceAsync(WorkflowInstance instance);
     Task<WorkflowInstance> UpdateWorkflowInstanceAsync(WorkflowInstance instance);
+    Task<WorkflowInstance> PartialUpdateWorkflowInstanceAsync(Guid workflowInstanceId, WorkflowInstance partialUpdate);
     Task<bool> TransitionWorkflowAsync(Guid instanceId, string targetState);
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByUserAsync();
+    Task<IEnumerable<WorkflowInstance>> GetAllWorkflowInstancesAsync();
     Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByStateAsync(string state);
     Task<WorkflowInstance> GetWorkflowInstanceByIdAsync(Guid id);
+
+    // Workflow Content Extensions
+    Task<bool> WorkflowContentExtensionExistsAsync(string contentId);
+    Task<Piranha.EditorialWorkflow.Models.WorkflowContentExtension> GetWorkflowContentExtensionAsync(string contentId);
+    Task<WorkflowInstance> CreateWorkflowInstanceWithContentAsync(string contentId, Guid workflowDefinitionId, string contentType = null, string contentTitle = null);
+    Task<IEnumerable<WorkflowContentExtension>> GetWorkflowContentExtensionsByDefinitionAsync(Guid workflowDefinitionId);
+    Task DeleteWorkflowInstanceAsync(Guid workflowInstanceId);
+    Task DeleteWorkflowContentExtensionAsync(string contentId);
 
     // Debug methods
     Task<bool> TestDatabaseConnectionAsync();
     Task<IEnumerable<Piranha.AspNetCore.Identity.Data.Role>> GetSystemRolesAsync();
-} 
+}

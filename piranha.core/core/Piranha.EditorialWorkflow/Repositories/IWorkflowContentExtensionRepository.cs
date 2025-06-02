@@ -13,46 +13,50 @@ using Piranha.EditorialWorkflow.Models;
 namespace Piranha.EditorialWorkflow.Repositories;
 
 /// <summary>
-/// Repository interface for WorkflowContentExtension operations
+/// Repository interface for managing workflow content extensions.
 /// </summary>
 public interface IWorkflowContentExtensionRepository
 {
     /// <summary>
-    /// Gets the workflow extension for the specified content.
+    /// Gets the workflow extension for the specified content by ID, including the current instance,
+    /// its definition, and current state.
     /// </summary>
-    /// <param name="contentId">The content id</param>
-    /// <returns>The workflow content extension</returns>
+    /// <param name="contentId">The unique content identifier.</param>
+    /// <returns>The workflow content extension or null if not found.</returns>
     Task<WorkflowContentExtension> GetByContentId(string contentId);
 
     /// <summary>
-    /// Gets all content currently in active workflows.
+    /// Gets all content items that currently have an active workflow instance,
+    /// ordered by last modified descending.
     /// </summary>
-    /// <returns>The workflow content extensions</returns>
+    /// <returns>A collection of workflow content extensions with active workflows.</returns>
     Task<IEnumerable<WorkflowContentExtension>> GetActiveWorkflows();
 
     /// <summary>
-    /// Gets all workflow extensions for the specified content type.
+    /// Gets all workflow content extensions for the specified content type
+    /// with active workflow instances, ordered by last modified descending.
     /// </summary>
-    /// <param name="contentType">The content type</param>
-    /// <returns>The workflow content extensions</returns>
+    /// <param name="contentType">The content type name.</param>
+    /// <returns>A collection of matching workflow content extensions.</returns>
     Task<IEnumerable<WorkflowContentExtension>> GetByContentType(string contentType);
 
     /// <summary>
-    /// Saves the given workflow content extension.
+    /// Saves or updates the specified workflow content extension.
+    /// If the content ID doesn't exist, a new record is created.
     /// </summary>
-    /// <param name="extension">The workflow content extension</param>
+    /// <param name="extension">The workflow content extension to save.</param>
     Task Save(WorkflowContentExtension extension);
 
     /// <summary>
-    /// Deletes the workflow extension for the specified content.
+    /// Deletes the workflow extension associated with the given content ID, if it exists.
     /// </summary>
-    /// <param name="contentId">The content id</param>
+    /// <param name="contentId">The content ID of the extension to delete.</param>
     Task Delete(string contentId);
 
     /// <summary>
-    /// Checks if a workflow extension exists for the specified content.
+    /// Determines whether a workflow content extension exists for the given content ID.
     /// </summary>
-    /// <param name="contentId">The content id</param>
-    /// <returns>True if an extension exists</returns>
+    /// <param name="contentId">The content ID to check.</param>
+    /// <returns>True if the extension exists; otherwise, false.</returns>
     Task<bool> Exists(string contentId);
 }

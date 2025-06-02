@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 using Piranha.Audit.Events;
 using Piranha.Audit.Models;
 

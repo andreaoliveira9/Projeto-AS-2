@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 using Microsoft.Extensions.Logging;
 using Piranha.Audit.Events;
 using Piranha.Audit.Models;
@@ -47,30 +49,27 @@ public sealed class AuditService : IAuditService
             var stateChangeRecord = new StateChangeRecord
             {
                 Id = Guid.NewGuid(),
-                WorkflowInstanceId = stateChangedEvent.WorkflowInstanceId,
                 ContentId = stateChangedEvent.ContentId,
-                ContentType = stateChangedEvent.ContentType,
+                ContentName = stateChangedEvent.ContentName,
                 FromState = stateChangedEvent.FromState,
                 ToState = stateChangedEvent.ToState,
-                UserId = stateChangedEvent.UserId,
-                Username = stateChangedEvent.Username,
+                transitionDescription = stateChangedEvent.transitionDescription,
+                reviewedBy = stateChangedEvent.reviewedBy,
+                approved = stateChangedEvent.approved,
                 Timestamp = stateChangedEvent.Timestamp,
                 Comments = stateChangedEvent.Comments,
-                TransitionRuleId = stateChangedEvent.TransitionRuleId,
-                Metadata = JsonSerializer.Serialize(stateChangedEvent.Metadata),
                 Success = stateChangedEvent.Success,
                 ErrorMessage = stateChangedEvent.ErrorMessage
             };
 
             await _stateChangeRecordRepository.SaveAsync(stateChangeRecord);
             
-            _logger.LogInformation("State change logged for content {ContentId} from {FromState} to {ToState} by user {UserId}",
-                stateChangedEvent.ContentId, stateChangedEvent.FromState, stateChangedEvent.ToState, stateChangedEvent.UserId);
+            _logger.LogInformation("State change logged for content {ContentId} from {FromState} to {ToState} by user {Username}, approved: {Approved}",
+                stateChangedEvent.ContentId, stateChangedEvent.FromState, stateChangedEvent.ToState, stateChangedEvent.reviewedBy, stateChangedEvent.approved);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process workflow state changed event {EventId}",
-                stateChangedEvent.EventId);
+            _logger.LogError(ex, "Failed to process workflow state change event for content {ContentId}", stateChangedEvent.ContentId);
             throw;
         }
     }

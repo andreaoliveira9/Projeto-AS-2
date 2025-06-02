@@ -90,15 +90,40 @@ public static class Menu
                     Policy = Permission.Modules,
                     Css = "fas fa-code-branch"
                 },
+            }
+        },
+        new MenuItem
+        {
+            InternalId = "Workflows",
+            Name = "Workflows",
+            Css = "fas fa-network-wired",
+            Items = new MenuItemList
+            {
                 new MenuItem
                 {
                     InternalId = "WorkflowList",
                     Name = "Editorial Workflows",
                     Route = "~/manager/workflows",
                     Policy = Permission.Workflows,
-                    Css = "fas fa-project-diagram"
-                }
+                    Css = "fas fa-stream"
+                },
+                new MenuItem
+                {
+                    InternalId = "WorkflowInstances",
+                    Name = "Workflow Instances",
+                    Route = "~/manager/workflow-instances",
+                    Policy = Permission.Workflows,
+                    Css = "fas fa-cogs"
+                },
+                new MenuItem
+                {
+                    InternalId = "Notifications",
+                    Name = "Notifications",
+                    Route = "~/manager/notifications",
+                    Policy = Permission.Workflows,
+                    Css = "fas fa-bell"
+                },
             }
-        }
+        },
     };
 }

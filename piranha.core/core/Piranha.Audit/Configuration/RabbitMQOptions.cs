@@ -8,6 +8,8 @@
  *
  */
 
+#nullable enable
+
 namespace Piranha.Audit.Configuration;
 
 /// <summary>
@@ -60,7 +62,7 @@ public sealed class RabbitMQOptions
     /// The exchange name for audit events.
     /// Default is "piranha.audit".
     /// </summary>
-    public string ExchangeName { get; set; } = "piranha.audit";
+    public string ExchangeName { get; set; } = "piranha.broadcast";
 
     /// <summary>
     /// The routing key for audit events.
@@ -131,5 +133,5 @@ public sealed class RabbitMQOptions
     /// <summary>
     /// Exchange type. Default is "direct".
     /// </summary>
-    public string ExchangeType { get; set; } = "direct";
+    public string ExchangeType { get; set; } = "fanout";
 }

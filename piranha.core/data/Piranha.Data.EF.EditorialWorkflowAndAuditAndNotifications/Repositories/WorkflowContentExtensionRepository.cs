@@ -44,8 +44,8 @@ internal class WorkflowContentExtensionRepository : IWorkflowContentExtensionRep
                 .ThenInclude(w => w.WorkflowDefinition)
             .Include(e => e.CurrentWorkflowInstance)
                 .ThenInclude(w => w.CurrentState)
-            .Where(e => e.IsInWorkflow && e.CurrentWorkflowInstance != null)
-            .OrderByDescending(e => e.LastModified)
+            .Where(e => e.CurrentWorkflowInstance != null)
+            .OrderByDescending(e => e.CurrentWorkflowInstance.LastModified)
             .ToListAsync()
             .ConfigureAwait(false);
 
@@ -56,8 +56,9 @@ internal class WorkflowContentExtensionRepository : IWorkflowContentExtensionRep
     {
         var extensions = await _db.Set<Data.EditorialWorkflow.WorkflowContentExtension>()
             .AsNoTracking()
-            .Where(e => e.ContentType == contentType)
-            .OrderByDescending(e => e.LastModified)
+            .Include(e => e.CurrentWorkflowInstance)
+            .Where(e => e.CurrentWorkflowInstance != null && e.CurrentWorkflowInstance.ContentType == contentType)
+            .OrderByDescending(e => e.CurrentWorkflowInstance.LastModified)
             .ToListAsync()
             .ConfigureAwait(false);
 
@@ -75,18 +76,13 @@ internal class WorkflowContentExtensionRepository : IWorkflowContentExtensionRep
             model = new Data.EditorialWorkflow.WorkflowContentExtension
             {
                 Id = extension.Id != Guid.Empty ? extension.Id : Guid.NewGuid(),
-                ContentId = extension.ContentId,
-                Created = DateTime.Now
+                ContentId = extension.ContentId
             };
             extension.Id = model.Id;
             await _db.Set<Data.EditorialWorkflow.WorkflowContentExtension>().AddAsync(model).ConfigureAwait(false);
         }
 
-        model.ContentType = extension.ContentType;
         model.CurrentWorkflowInstanceId = extension.CurrentWorkflowInstanceId;
-        model.IsInWorkflow = extension.IsInWorkflow;
-        model.LastWorkflowState = extension.LastWorkflowState;
-        model.LastModified = DateTime.Now;
 
         await _db.SaveChangesAsync().ConfigureAwait(false);
     }
@@ -117,12 +113,7 @@ internal class WorkflowContentExtensionRepository : IWorkflowContentExtensionRep
         {
             Id = model.Id,
             ContentId = model.ContentId,
-            ContentType = model.ContentType,
-            CurrentWorkflowInstanceId = model.CurrentWorkflowInstanceId,
-            IsInWorkflow = model.IsInWorkflow,
-            LastWorkflowState = model.LastWorkflowState,
-            Created = model.Created,
-            LastModified = model.LastModified
+            CurrentWorkflowInstanceId = model.CurrentWorkflowInstanceId
         };
     }
 }

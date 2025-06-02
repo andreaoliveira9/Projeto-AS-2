@@ -62,7 +62,10 @@ piranha.pageedit = new Vue({
         },
         selectedSetting: "uid-settings",
         selectedRoute: null,
-        routes: []
+        routes: [],
+        workflowDefinitions: [],
+        selectedWorkflow: "",
+        workflowsLoaded: false
     },
     computed: {
         contentRegions: function () {
@@ -460,6 +463,42 @@ piranha.pageedit = new Vue({
             } else {
                 this.excerpt = e.target.innerHTML;
             }
+        },
+        loadWorkflowsIfNeeded: function () {
+            if (!this.workflowsLoaded) {
+                this.loadWorkflows();
+            }
+        },
+        loadWorkflows: function () {
+            var self = this;
+            
+            fetch(piranha.baseUrl + "api/workflow/definitions")
+                .then(function (response) { 
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json(); 
+                })
+                .then(function (result) {
+                    self.workflowDefinitions = result || [];
+                    self.workflowsLoaded = true;
+                    console.log('Loaded workflow definitions:', self.workflowDefinitions);
+                })
+                .catch(function (error) { 
+                    console.log("Error loading workflow definitions:", error);
+                    self.workflowDefinitions = [];
+                });
+        },
+        getSelectedWorkflowDetails: function () {
+            var self = this;
+            if (self.selectedWorkflow && self.workflowDefinitions.length > 0) {
+                for (var i = 0; i < self.workflowDefinitions.length; i++) {
+                    if (self.workflowDefinitions[i].id === self.selectedWorkflow) {
+                        return self.workflowDefinitions[i];
+                    }
+                }
+            }
+            return null;
         }
     },
     created: function () {
