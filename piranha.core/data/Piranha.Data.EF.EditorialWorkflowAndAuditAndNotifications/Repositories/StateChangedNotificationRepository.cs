@@ -53,6 +53,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
             ContentName = n.ContentName,
             FromState = n.FromState,
             ToState = n.ToState,
+            Comments = n.Comments,
             TransitionDescription = n.TransitionDescription,
             ReviewedBy = n.ReviewedBy,
             Approved = n.Approved
@@ -82,6 +83,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
             ContentName = notification.ContentName,
             FromState = notification.FromState,
             ToState = notification.ToState,
+            Comments = notification.Comments,
             TransitionDescription = notification.TransitionDescription,
             ReviewedBy = notification.ReviewedBy,
             Approved = notification.Approved
@@ -108,6 +110,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
                 ContentName = model.ContentName,
                 FromState = model.FromState,
                 ToState = model.ToState,
+                Comments = model.Comments,
                 TransitionDescription = model.TransitionDescription,
                 ReviewedBy = model.ReviewedBy,
                 Approved = model.Approved
@@ -121,6 +124,7 @@ public class StateChangedNotificationRepository : IStateChangedNotificationRepos
             notification.ContentName = model.ContentName;
             notification.FromState = model.FromState;
             notification.ToState = model.ToState;
+            notification.Comments = model.Comments;
             notification.TransitionDescription = model.TransitionDescription;
             notification.ReviewedBy = model.ReviewedBy;
             notification.Approved = model.Approved;

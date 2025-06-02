@@ -37,6 +37,11 @@ public sealed class StateChangedNotification : Notification
     public string ToState { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets/sets the previous state of the content.
+    /// </summary>
+    public string Comments { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets/sets the transition rule id that triggered this change.
     /// </summary>
     public string TransitionDescription { get; set; } = string.Empty;

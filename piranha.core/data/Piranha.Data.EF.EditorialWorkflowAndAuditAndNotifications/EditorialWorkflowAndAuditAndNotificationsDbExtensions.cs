@@ -234,6 +234,7 @@ public static class EditorialWorkflowAndAuditAndNotificationsDbExtensions
         stateChangedNotification.Property(n => n.TransitionDescription).IsRequired().HasMaxLength(500);
         stateChangedNotification.Property(n => n.ReviewedBy).IsRequired().HasMaxLength(256);
         stateChangedNotification.Property(n => n.Approved).IsRequired().HasDefaultValue(true);
+        stateChangedNotification.Property(n => n.Comments).HasMaxLength(1000);
         
         // Indexes for StateChangedNotification
         stateChangedNotification.HasIndex(n => n.ContentId);

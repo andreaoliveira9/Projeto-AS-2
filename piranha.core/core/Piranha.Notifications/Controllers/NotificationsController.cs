@@ -179,6 +179,7 @@ public class NotificationsController : ControllerBase
             ContentId = notification.ContentId,
             ContentName = notification.ContentName,
             FromState = notification.FromState,
+            Comments = notification.Comments,
             ToState = notification.ToState,
             TransitionDescription = notification.TransitionDescription,
             ReviewedBy = notification.ReviewedBy,
@@ -222,6 +223,11 @@ public class StateChangedNotificationDto
     /// Gets/sets the new state of the content.
     /// </summary>
     public string ToState { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets/sets the new state of the content.
+    /// </summary>
+    public string Comments { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets/sets the transition rule description that triggered this change.

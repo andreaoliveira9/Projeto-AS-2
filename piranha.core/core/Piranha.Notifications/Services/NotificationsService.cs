@@ -53,6 +53,7 @@ public sealed class NotificationsService : INotificationsService
                 ContentId = stateChangedEvent.ContentId,
                 ContentName = stateChangedEvent.ContentName,
                 FromState = stateChangedEvent.FromState,
+                Comments = stateChangedEvent.Comments,
                 ToState = stateChangedEvent.ToState,
                 TransitionDescription = stateChangedEvent.transitionDescription,
                 ReviewedBy = stateChangedEvent.reviewedBy,

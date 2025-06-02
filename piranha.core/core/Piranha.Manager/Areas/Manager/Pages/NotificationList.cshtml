@@ -344,7 +344,7 @@
                                         <th>Content</th>
                                         <th>State Transition</th>
                                         <th>Reviewed By</th>
-                                        <th>Description</th>
+                                        <th>Comment</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -375,8 +375,8 @@
                                             <span class="font-weight-medium">{{ notification.approvedBy || 'System' }}</span>
                                         </td>
                                         <td>
-                                            <span class="text-truncate" style="max-width: 200px; display: inline-block;" :title="notification.transitionDescription">
-                                                {{ notification.transitionDescription || 'No description' }}
+                                            <span class="text-truncate" style="max-width: 200px; display: inline-block;" :title="notification.Comments">
+                                                {{ notification.comments || 'No description' }}
                                             </span>
                                         </td>
                                         <td>
