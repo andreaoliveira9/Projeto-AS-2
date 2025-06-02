@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Metrics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .metric-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .metric-value { font-size: 2em; font-weight: bold; color: #2196F3; }
+        .metric-label { font-size: 0.9em; color: #666; margin-top: 5px; }
+        .metric-change { font-size: 0.8em; margin-top: 5px; }
+        .positive { color: #4CAF50; }
+        .negative { color: #f44336; }
+        .chart-container { height: 200px; margin-top: 15px; }
+        .status { padding: 10px; border-radius: 4px; margin-bottom: 20px; }
+        .status.running { background: #e8f5e8; border: 1px solid #4CAF50; color: #2e7d32; }
+        .status.stopped { background: #ffebee; border: 1px solid #f44336; color: #c62828; }
+        .controls { margin-bottom: 20px; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #2196F3; color: white; }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Piranha CMS - Real-time Metrics Dashboard</h1>
+    
+    <div class="controls">
+        <button class="btn btn-success" onclick="startMetrics()">Start Monitoring</button>
+        <button class="btn btn-danger" onclick="stopMetrics()">Stop Monitoring</button>
+        <button class="btn btn-primary" onclick="triggerTestMetrics()">Trigger Test Metrics</button>
+        <button class="btn btn-primary" onclick="runLoadTest()">Run Load Test</button>
+    </div>
+    
+    <div id="status" class="status stopped">
+        Status: Monitoring Stopped
+    </div>
+    
+    <div class="dashboard">
+        <div class="metric-card">
+            <div class="metric-value" id="pages-created">0</div>
+            <div class="metric-label">Pages Created</div>
+            <div class="metric-change" id="pages-created-change"></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value" id="pages-published">0</div>
+            <div class="metric-label">Pages Published</div>
+            <div class="metric-change" id="pages-published-change"></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value" id="workflow-transitions">0</div>
+            <div class="metric-label">Workflow Transitions</div>
+            <div class="metric-change" id="workflow-transitions-change"></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value" id="media-uploaded">0</div>
+            <div class="metric-label">Media Uploaded</div>
+            <div class="metric-change" id="media-uploaded-change"></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value" id="total-pages">0</div>
+            <div class="metric-label">Total Pages</div>
+            <div class="metric-change" id="total-pages-change"></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value" id="active-requests">0</div>
+            <div class="metric-label">Active HTTP Requests</div>
+            <div class="metric-change" id="active-requests-change"></div>
+        </div>
+    </div>
+    
+    <div class="dashboard" style="margin-top: 20px;">
+        <div class="metric-card">
+            <h3>Page Creation Rate</h3>
+            <div class="chart-container">
+                <canvas id="pageChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <h3>Workflow Activity</h3>
+            <div class="chart-container">
+                <canvas id="workflowChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let isMonitoring = false;
+        let intervalId;
+        let previousValues = {};
+        
+        // Initialize charts
+        const pageCtx = document.getElementById('pageChart').getContext('2d');
+        const workflowCtx = document.getElementById('workflowChart').getContext('2d');
+        
+        const pageChart = new Chart(pageCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Pages Created',
+                    data: [],
+                    borderColor: '#2196F3',
+                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+        
+        const workflowChart = new Chart(workflowCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Workflow Transitions',
+                    data: [],
+                    borderColor: '#4CAF50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+        
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('/metrics');
+                const text = await response.text();
+                return parsePrometheusMetrics(text);
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+                return {};
+            }
+        }
+        
+        function parsePrometheusMetrics(text) {
+            const metrics = {};
+            const lines = text.split('\n');
+            
+            for (const line of lines) {
+                if (line.startsWith('#') || !line.trim()) continue;
+                
+                const match = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*(?:\{[^}]*\})?) (.+)$/);
+                if (match) {
+                    const [, metricName, value] = match;
+                    metrics[metricName] = parseFloat(value);
+                }
+            }
+            
+            return metrics;
+        }
+        
+        function updateMetrics(metrics) {
+            const updates = [
+                { id: 'pages-created', key: 'piranha_pages_created_total' },
+                { id: 'pages-published', key: 'piranha_pages_published_total' },
+                { id: 'workflow-transitions', key: 'piranha_workflow_transitions_total' },
+                { id: 'media-uploaded', key: 'piranha_media_uploaded_total' },
+                { id: 'total-pages', key: 'piranha_pages_total' },
+                { id: 'active-requests', key: 'http_server_active_requests' }
+            ];
+            
+            updates.forEach(({ id, key }) => {
+                const element = document.getElementById(id);
+                const changeElement = document.getElementById(id + '-change');
+                const currentValue = metrics[key] || 0;
+                const previousValue = previousValues[key] || 0;
+                const change = currentValue - previousValue;
+                
+                if (element) {
+                    element.textContent = Math.round(currentValue);
+                    
+                    if (changeElement) {
+                        if (change > 0) {
+                            changeElement.textContent = `+${change}`;
+                            changeElement.className = 'metric-change positive';
+                        } else if (change < 0) {
+                            changeElement.textContent = change.toString();
+                            changeElement.className = 'metric-change negative';
+                        } else {
+                            changeElement.textContent = 'No change';
+                            changeElement.className = 'metric-change';
+                        }
+                    }
+                }
+                
+                previousValues[key] = currentValue;
+            });
+            
+            // Update charts
+            const now = new Date().toLocaleTimeString();
+            
+            // Page chart
+            pageChart.data.labels.push(now);
+            pageChart.data.datasets[0].data.push(metrics['piranha_pages_created_total'] || 0);
+            if (pageChart.data.labels.length > 20) {
+                pageChart.data.labels.shift();
+                pageChart.data.datasets[0].data.shift();
+            }
+            pageChart.update('none');
+            
+            // Workflow chart
+            workflowChart.data.labels.push(now);
+            workflowChart.data.datasets[0].data.push(metrics['piranha_workflow_transitions_total'] || 0);
+            if (workflowChart.data.labels.length > 20) {
+                workflowChart.data.labels.shift();
+                workflowChart.data.datasets[0].data.shift();
+            }
+            workflowChart.update('none');
+        }
+        
+        async function startMetrics() {
+            if (isMonitoring) return;
+            
+            isMonitoring = true;
+            document.getElementById('status').className = 'status running';
+            document.getElementById('status').textContent = 'Status: Monitoring Active';
+            
+            intervalId = setInterval(async () => {
+                const metrics = await fetchMetrics();
+                updateMetrics(metrics);
+            }, 2000); // Update every 2 seconds
+        }
+        
+        function stopMetrics() {
+            isMonitoring = false;
+            if (intervalId) clearInterval(intervalId);
+            
+            document.getElementById('status').className = 'status stopped';
+            document.getElementById('status').textContent = 'Status: Monitoring Stopped';
+        }
+        
+        async function triggerTestMetrics() {
+            try {
+                const response = await fetch('/api/metricstest/trigger-all-metrics', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    alert('Test metrics triggered successfully!');
+                } else {
+                    alert('Failed to trigger test metrics');
+                }
+            } catch (error) {
+                alert('Error triggering test metrics: ' + error.message);
+            }
+        }
+        
+        async function runLoadTest() {
+            alert('Starting load test... Check your terminal/Docker logs for k6 output.');
+            // Note: This would need to trigger the Docker Compose load test
+            // For now, just show a message
+        }
+        
+        // Auto-start monitoring when page loads
+        window.addEventListener('load', () => {
+            startMetrics();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+version: '3.8'
+
+services:
+  # RabbitMQ for messaging
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: mvcweb-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - mvcweb-network
+
+  # MvcWeb Application
+  mvcweb-app:
+    build:
+      context: ../../
+      dockerfile: ./examples/MvcWeb/Dockerfile
+    container_name: mvcweb-app
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Testing
+      - ASPNETCORE_HTTP_PORTS=8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://mvcweb-otel-collector:4317
+      - OTEL_SERVICE_NAME=mvcweb-app
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=piranha,deployment.environment=testing
+      - OTEL_DOTNET_AUTO_METRICS_ADDITIONAL_SOURCES=MvcWeb.*,Piranha.*
+      - ConnectionStrings__piranha=Filename=/app/piranha.db
+      - RabbitMQ__HostName=mvcweb-rabbitmq
+      - RabbitMQ__UserName=admin
+      - RabbitMQ__Password=admin
+    depends_on:
+      - rabbitmq
+      - otel-collector
+    volumes:
+      - mvcweb_data:/app/data
+      - mvcweb_uploads:/app/wwwroot/uploads
+    networks:
+      - mvcweb-network
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: mvcweb-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      # - "4317:4317"   # OTLP gRPC receiver
+      # - "4318:4318"   # OTLP HTTP receiver
+      # - "8888:8888"   # Prometheus metrics
+      # - "8889:8889"   # Prometheus exporter metrics
+      # - "13133:13133" # health_check extension
+      # - "55679:55679" # zpages extension
+      - "4319:4317"     # OTLP gRPC receiver
+      - "8890:8889"     # Prometheus metrics exporter
+    depends_on:
+      - jaeger
+      - prometheus
+    networks:
+      - mvcweb-network
+
+  # Jaeger v2 - Simplified setup
+  jaeger:
+    image: jaegertracing/jaeger:2.3.0
+    container_name: mvcweb-jaeger
+    ports:
+      # - "16686:16686"    # Jaeger UI
+      # - "14269:14269"    # Admin port health check
+      # - "4317:4317"      # OTLP gRPC receiver
+      # - "4318:4318"      # OTLP HTTP receiver
+      - "16686:16686"    # Jaeger UI
+      - "4317:4317"      # OTLP gRPC receiver
+      - "4318:4318"      # OTLP HTTP receiver
+      - "14250:14250"    # Jaeger collector
+      - "14269:14269"    # Admin port health check
+      - "9411:9411"      # Zipkin
+      - "6831:6831/udp"  # Jaeger thrift UDP
+      - "8888:8888"      # Prometheus metrics
+      - "8889:8889"      # Prometheus span metrics
+    environment:
+      - JAEGER_DISABLE=false
+    volumes:
+      - ./jaeger-v2-config.yaml:/etc/jaeger/config.yaml:ro
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    depends_on:
+      - prometheus
+    networks:
+      - mvcweb-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mvcweb-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - mvcweb-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: mvcweb-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_FEATURE_TOGGLES_ENABLE=traceToMetrics
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - jaeger
+    networks:
+      - mvcweb-network
+
+  # k6 for load testing
+  k6:
+    image: grafana/k6:latest
+    container_name: mvcweb-k6
+    environment:
+      - K6_OUT=experimental-prometheus-rw
+      - K6_PROMETHEUS_RW_SERVER_URL=http://mvcweb-prometheus:9090/api/v1/write
+      - K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true
+      - BASE_URL=http://mvcweb-app:8080
+      - ENVIRONMENT=Testing
+    volumes:
+      - ./LoadTests:/scripts
+    # Default: run full CMS test. Can override with:
+    # docker-compose run k6 run /scripts/scripts/page-workflow-focused-test.js
+    command: ["run", "/scripts/scripts/full-cms-load-test.js"]
+    depends_on:
+      - mvcweb-app
+      - prometheus
+    networks:
+      - mvcweb-network
+    profiles:
+      - loadtest
+
+volumes:
+  rabbitmq_data:
+  mvcweb_data:
+  mvcweb_uploads:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  mvcweb-network:
+    driver: bridge

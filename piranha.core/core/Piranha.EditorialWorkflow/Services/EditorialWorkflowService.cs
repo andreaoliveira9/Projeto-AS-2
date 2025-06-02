@@ -507,6 +507,11 @@ public class EditorialWorkflowService : IEditorialWorkflowService
     public async Task<IEnumerable<WorkflowInstance>> GetWorkflowInstancesByUserAsync() 
     { 
         var user = await _userManager.GetUserAsync(_httpContextAccessor.HttpContext.User);
+        if (user == null)
+        {
+            // Return empty list when no user is authenticated (e.g., during load tests)
+            return new List<WorkflowInstance>();
+        }
         return await _workflowInstanceRepository.GetByUser(user.Id.ToString()); 
     }
     
