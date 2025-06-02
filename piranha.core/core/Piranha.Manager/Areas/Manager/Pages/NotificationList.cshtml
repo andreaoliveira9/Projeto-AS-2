@@ -376,7 +376,7 @@
                                         </td>
                                         <td>
                                             <span class="text-truncate" style="max-width: 200px; display: inline-block;" :title="notification.Comments">
-                                                {{ notification.comments || 'No description' }}
+                                                {{ notification.comments || 'No comment' }}
                                             </span>
                                         </td>
                                         <td>
@@ -465,6 +465,10 @@
                             <h6>Transition Description</h6>
                             <div class="alert alert-info">
                                 {{ selectedNotification.transitionDescription || 'No description provided' }}
+                            </div>
+                            <h6>Comment</h6>
+                            <div class="alert alert-info">
+                                {{ selectedNotification.comments || 'No comment provided' }}
                             </div>
                         </div>
                     </div>
